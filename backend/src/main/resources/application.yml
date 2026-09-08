@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: project926-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # NEVER change this to create/create-drop/update against a real database.
+      # The existing PostgreSQL schema (see ../supabase/schema.sql in the repo
+      # root) is authoritative; Hibernate is only allowed to check that JPA
+      # entities match it, never to change it.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    # DTO fields are camelCase Java; this serializes them as snake_case JSON
+    # (organizer_id, event_date, quantity_total, ...) to match the existing
+    # Next.js response field names (lib/types.ts) ahead of a future frontend
+    # cutover — no per-field @JsonProperty needed.
+    property-naming-strategy: SNAKE_CASE
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    db:
+      enabled: true

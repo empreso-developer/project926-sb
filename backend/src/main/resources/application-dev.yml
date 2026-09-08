@@ -1,0 +1,44 @@
+# Development profile — targets the DEVELOPMENT Supabase project only
+# (memdvuuszsistdjckcfp.supabase.co, confirmed with the project owner).
+# NEVER point these env vars at the original production Supabase project.
+#
+# All values below come from environment variables. Nothing here is a real
+# secret — only ${VAR:default} placeholders. Populate the real values in a
+# local, gitignored env (e.g. backend/.env.dev loaded by your shell, or your
+# IDE run configuration), never by editing this file.
+spring:
+  datasource:
+    url: jdbc:postgresql://${SUPABASE_DB_HOST}:${SUPABASE_DB_PORT:5432}/${SUPABASE_DB_NAME:postgres}?sslmode=require
+    username: ${SUPABASE_DB_USER}
+    password: ${SUPABASE_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${SUPABASE_DB_POOL_SIZE:5}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Clerk's JWKS endpoint for this dev instance. Derived from the
+          # (public) NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY already used by the
+          # Next.js app in .env.local — the publishable key base64-encodes
+          # the Frontend API domain, which is not secret. Overridable via env
+          # var so a different Clerk dev/staging instance can be swapped in
+          # without touching this file.
+          jwk-set-uri: ${CLERK_JWK_SET_URI:https://solid-grouper-15.clerk.accounts.dev/.well-known/jwks.json}
+          issuer-uri: ${CLERK_ISSUER:https://solid-grouper-15.clerk.accounts.dev}
+
+# Razorpay — mirrors lib/razorpay/server.ts's two env vars exactly.
+# RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET are server-side only, used to
+# construct the API client. razorpay.public-key-id is the value the
+# create-order response returns to the browser (the existing route returns
+# NEXT_PUBLIC_RAZORPAY_KEY_ID specifically, not RAZORPAY_KEY_ID) — defaults
+# to the same value as key-id since in practice they're the same test key,
+# but stays independently overridable via RAZORPAY_PUBLIC_KEY_ID.
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID}
+  key-secret: ${RAZORPAY_KEY_SECRET}
+  public-key-id: ${RAZORPAY_PUBLIC_KEY_ID:${RAZORPAY_KEY_ID}}
+
+logging:
+  level:
+    com.project926.backend: DEBUG
+    org.springframework.security: INFO

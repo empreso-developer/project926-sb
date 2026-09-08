@@ -1,0 +1,20 @@
+# Used only by @WebMvcTest slices (SecurityConfigTest) that load the web +
+# security layers without a DataSource. Values are dummy/unreachable on
+# purpose — these tests never trigger an actual JWKS fetch, since a request
+# with no Authorization header is rejected before the decoder runs.
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: https://example.invalid/.well-known/jwks.json
+          issuer-uri: https://example.invalid
+
+# Dummy values only — RazorpayClient's constructor requires non-null
+# strings but never makes a network call just from being constructed, so
+# these are safe placeholders for any test slice that happens to touch the
+# RazorpayGateway bean without mocking it out.
+razorpay:
+  key-id: rzp_test_dummy_key_id
+  key-secret: dummy_test_secret
+  public-key-id: rzp_test_dummy_key_id

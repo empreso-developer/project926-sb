@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 98%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 98%;
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 0 0% 100%;
+    --grid-line: 0 0% 12%;
+    --gradient-pink: 330 80% 65%;
+    --gradient-purple: 270 70% 60%;
+    --gradient-orange: 20 90% 60%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground antialiased; }
+}
+
+@layer components {
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, hsl(var(--grid-line)) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--grid-line)) 1px, transparent 1px);
+    background-size: 96px 96px;
+  }
+  .font-mono-display {
+    font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: -0.02em;
+  }
+  .gradient-block {
+    background: linear-gradient(90deg, hsl(var(--gradient-purple) / 0.9), hsl(var(--gradient-pink) / 0.9), hsl(var(--gradient-orange) / 0.7));
+    position: relative;
+    overflow: hidden;
+  }
+  .gradient-block::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    opacity: 0.55;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+  .dot-bg {
+    background-image: radial-gradient(
+      circle,
+      hsl(var(--grid-line)) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
+  }
+
+  .cross-bg {
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        hsl(var(--grid-line)) 0px,
+        hsl(var(--grid-line)) 1px,
+        transparent 1px,
+        transparent 12px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        hsl(var(--grid-line)) 0px,
+        hsl(var(--grid-line)) 1px,
+        transparent 1px,
+        transparent 12px
+      );
+  }
+
+  .diagonal-bg {
+    background-image: repeating-linear-gradient(
+      135deg,
+      hsl(var(--grid-line)) 0px,
+      hsl(var(--grid-line)) 2px,
+      transparent 0px,
+      transparent 8px
+    );
+  }
+}
+
+/* OPTIMIZATIONS: Smooth animations for better UX without jank */
+@keyframes fadeUp {
+  0% {
+    opacity: 0;
+    transform: translateX(20px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fadeUp {
+  animation: fadeUp 0.6s ease forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.5s ease;
+}
+
+/* Optimize font loading to prevent layout shift */
+@font-feature-settings: "kern" 1;
+@font-display: swap;
+
+
+
+.bento-hatch {
+  background-image:
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.06) 0px,
+      rgba(255, 255, 255, 0.06) 2px,
+      transparent 2px,
+      transparent 12px
+    );
+}
+
+@keyframes marquee-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marquee-right {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-marquee-left {
+  animation: marquee-left 25s linear infinite;
+}
+
+.animate-marquee-right {
+  animation: marquee-right 25s linear infinite;
+}
+
+
+@keyframes fade {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade {
+  animation: fade 0.7s ease;
+}

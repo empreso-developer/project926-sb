@@ -1,0 +1,29 @@
+# Production profile — PLACEHOLDER ONLY.
+#
+# Not wired up to any real production credentials as part of this migration
+# phase, and must not be until the cutover plan (see the migration audit) is
+# explicitly approved. Every value is an environment variable reference; none
+# of this file should ever need a real secret pasted into it.
+spring:
+  datasource:
+    url: jdbc:postgresql://${SUPABASE_DB_HOST}:${SUPABASE_DB_PORT:5432}/${SUPABASE_DB_NAME:postgres}?sslmode=require
+    username: ${SUPABASE_DB_USER}
+    password: ${SUPABASE_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${SUPABASE_DB_POOL_SIZE:10}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${CLERK_JWK_SET_URI}
+          issuer-uri: ${CLERK_ISSUER}
+
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID}
+  key-secret: ${RAZORPAY_KEY_SECRET}
+  public-key-id: ${RAZORPAY_PUBLIC_KEY_ID:${RAZORPAY_KEY_ID}}
+
+logging:
+  level:
+    com.project926.backend: INFO
+    org.springframework.security: WARN
