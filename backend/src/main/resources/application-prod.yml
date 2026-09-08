@@ -23,6 +23,14 @@ razorpay:
   key-secret: ${RAZORPAY_KEY_SECRET}
   public-key-id: ${RAZORPAY_PUBLIC_KEY_ID:${RAZORPAY_KEY_ID}}
 
+resend:
+  api-key: ${RESEND_API_KEY}
+  from-email: ${RESEND_FROM_EMAIL}
+  reply-to: ${RESEND_REPLY_TO:}
+
+app:
+  public-url: ${NEXT_PUBLIC_APP_URL}
+
 logging:
   level:
     com.project926.backend: INFO

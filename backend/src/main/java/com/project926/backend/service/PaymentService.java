@@ -14,6 +14,7 @@ import com.project926.backend.exception.ForbiddenException;
 import com.project926.backend.exception.PaymentFlowNotFoundException;
 import com.project926.backend.exception.RazorpayGatewayException;
 import com.project926.backend.exception.SoldOutException;
+import com.project926.backend.integration.qrcode.QrCodeGenerator;
 import com.project926.backend.integration.razorpay.RazorpayGateway;
 import com.project926.backend.repository.BookingInventoryRepository;
 import com.project926.backend.repository.BookingRepository;
@@ -63,6 +64,8 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final BookingInventoryRepository bookingInventoryRepository;
     private final RazorpayGateway razorpayGateway;
+    private final QrCodeGenerator qrCodeGenerator;
+    private final TicketEmailService ticketEmailService;
 
     public PaymentService(
         EventRepository eventRepository,
@@ -70,7 +73,9 @@ public class PaymentService {
         BookingRepository bookingRepository,
         PaymentRepository paymentRepository,
         BookingInventoryRepository bookingInventoryRepository,
-        RazorpayGateway razorpayGateway
+        RazorpayGateway razorpayGateway,
+        QrCodeGenerator qrCodeGenerator,
+        TicketEmailService ticketEmailService
     ) {
         this.eventRepository = eventRepository;
         this.ticketTypeRepository = ticketTypeRepository;
@@ -78,6 +83,8 @@ public class PaymentService {
         this.paymentRepository = paymentRepository;
         this.bookingInventoryRepository = bookingInventoryRepository;
         this.razorpayGateway = razorpayGateway;
+        this.qrCodeGenerator = qrCodeGenerator;
+        this.ticketEmailService = ticketEmailService;
     }
 
     // ================= create-order =================
@@ -247,10 +254,13 @@ public class PaymentService {
             throw new BookingValidationException("Payment amount mismatch");
         }
 
-        // QR code generation is explicitly out of scope for Phase D — see
-        // VerifyPaymentResponse's Javadoc. null is a valid value for the
-        // nullable bookings.qr_code column.
-        String qrCode = null;
+        // Generate the QR code (pure function of booking reference/id/event_id
+        // — deterministic, so it's identical however many times this runs,
+        // exactly matching the existing route's comment). Generated BEFORE
+        // calling confirm_booking_and_commit_inventory, since the RPC
+        // persists it as part of that same call (p_qr_code) — same sequence
+        // as the existing route, not decoupled into a separate UPDATE.
+        String qrCode = qrCodeGenerator.generateDataUrl(booking.getReference(), booking.getId(), booking.getEventId());
 
         boolean newlyConfirmed;
         try {
@@ -281,9 +291,19 @@ public class PaymentService {
             log.info("[verify] Booking {} was already confirmed, skipping", booking.getReference());
         }
 
-        // Resend email is explicitly out of scope for Phase D (Step 24) —
-        // the existing route's email step is intentionally not reproduced
-        // here; it never affects this response either way in the original.
+        // Email delivery is a secondary notification channel, not the source
+        // of truth for payment confirmation — never let it affect this
+        // response. sendBookingConfirmationEmailOnce has its own idempotency
+        // claim, so this is safe to call even on the "already confirmed"
+        // branch. TicketEmailService already never throws internally; this
+        // try/catch is redundant belt-and-suspenders protection, matching
+        // the existing route's own equally-redundant try/catch around the
+        // same already-safe call.
+        try {
+            ticketEmailService.sendBookingConfirmationEmailOnce(booking, qrCode);
+        } catch (Exception emailErr) {
+            log.error("[email/ticket] Unexpected error sending confirmation email", emailErr);
+        }
 
         return new VerifyPaymentResponse(true, booking.getId(), booking.getReference(), qrCode);
     }

@@ -13,6 +13,7 @@ import com.project926.backend.exception.ForbiddenException;
 import com.project926.backend.exception.PaymentFlowNotFoundException;
 import com.project926.backend.exception.RazorpayGatewayException;
 import com.project926.backend.exception.SoldOutException;
+import com.project926.backend.integration.qrcode.QrCodeGenerator;
 import com.project926.backend.integration.razorpay.RazorpayGateway;
 import com.project926.backend.repository.BookingInventoryRepository;
 import com.project926.backend.repository.BookingRepository;
@@ -60,10 +61,12 @@ class PaymentServiceTest {
     @Mock private PaymentRepository paymentRepository;
     @Mock private BookingInventoryRepository bookingInventoryRepository;
     @Mock private RazorpayGateway razorpayGateway;
+    @Mock private QrCodeGenerator qrCodeGenerator;
+    @Mock private TicketEmailService ticketEmailService;
 
     private PaymentService service() {
         return new PaymentService(eventRepository, ticketTypeRepository, bookingRepository,
-            paymentRepository, bookingInventoryRepository, razorpayGateway);
+            paymentRepository, bookingInventoryRepository, razorpayGateway, qrCodeGenerator, ticketEmailService);
     }
 
     private static final String CUSTOMER_ID = "user_customer000000000000";
@@ -451,16 +454,18 @@ class PaymentServiceTest {
     }
 
     @Test
-    void verifyPayment_success_marksPaidAndReturnsSuccessResponse() throws RazorpayException {
+    void verifyPayment_success_generatesQrPersistsItAndSendsEmail() throws RazorpayException {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
-        when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+        Booking pendingBooking = booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null);
+        String fakeQrDataUrl = "data:image/png;base64,ZmFrZS1xci1ieXRlcw==";
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(pendingBooking));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
             .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_x", "captured", 50000, "INR"));
-        when(bookingInventoryRepository.confirmBookingAndCommitInventory(eq(bookingId), any())).thenReturn(true);
+        when(qrCodeGenerator.generateDataUrl("BK-1", bookingId, pendingBooking.getEventId())).thenReturn(fakeQrDataUrl);
+        when(bookingInventoryRepository.confirmBookingAndCommitInventory(bookingId, fakeQrDataUrl)).thenReturn(true);
 
         VerifyPaymentResponse response = service().verifyPayment(CUSTOMER_ID,
             new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
@@ -468,7 +473,38 @@ class PaymentServiceTest {
         assertThat(response.success()).isTrue();
         assertThat(response.bookingId()).isEqualTo(bookingId);
         assertThat(response.reference()).isEqualTo("BK-1");
-        assertThat(response.qrCode()).isNull(); // QR generation out of scope for Phase D
+        // The QR is generated BEFORE confirm_booking_and_commit_inventory
+        // and passed as its p_qr_code param — proven by the stub above
+        // only matching that exact value — and the same freshly-generated
+        // value (not a stale booking.getQrCode()) is what's returned to
+        // the client and handed to the email service.
+        assertThat(response.qrCode()).isEqualTo(fakeQrDataUrl);
+        verify(paymentRepository).markPaid(paymentId, "pay_x", "sig_x", "paid");
+        verify(ticketEmailService).sendBookingConfirmationEmailOnce(pendingBooking, fakeQrDataUrl);
+    }
+
+    @Test
+    void verifyPayment_emailFailureDoesNotFailTheOtherwiseSuccessfulResponse() throws RazorpayException {
+        UUID bookingId = UUID.randomUUID();
+        UUID paymentId = UUID.randomUUID();
+        Booking pendingBooking = booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null);
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(pendingBooking));
+        when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
+            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+        when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
+        when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_x", "captured", 50000, "INR"));
+        when(bookingInventoryRepository.confirmBookingAndCommitInventory(any(), any())).thenReturn(true);
+        // TicketEmailService itself never throws (it catches its own
+        // errors) — this simulates the redundant belt-and-suspenders case
+        // where it somehow does, proving PaymentService's own try/catch
+        // still protects the response.
+        org.mockito.Mockito.doThrow(new RuntimeException("resend down"))
+            .when(ticketEmailService).sendBookingConfirmationEmailOnce(any(), any());
+
+        VerifyPaymentResponse response = service().verifyPayment(CUSTOMER_ID,
+            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
+
+        assertThat(response.success()).isTrue();
         verify(paymentRepository).markPaid(paymentId, "pay_x", "sig_x", "paid");
     }
 

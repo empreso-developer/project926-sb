@@ -38,6 +38,19 @@ razorpay:
   key-secret: ${RAZORPAY_KEY_SECRET}
   public-key-id: ${RAZORPAY_PUBLIC_KEY_ID:${RAZORPAY_KEY_ID}}
 
+# Resend — same env var names as lib/resend/server.ts exactly (not renamed).
+# RESEND_REPLY_TO stays optional there too (falls back to undefined/unset).
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from-email: ${RESEND_FROM_EMAIL:Project926 Tickets <onboarding@resend.dev>}
+  reply-to: ${RESEND_REPLY_TO:}
+
+# Same env var name as the existing Next.js app's NEXT_PUBLIC_APP_URL,
+# reused rather than renamed — used to build the ticket email's
+# "View My Tickets" dashboard link, exactly like the existing route.
+app:
+  public-url: ${NEXT_PUBLIC_APP_URL:http://localhost:3000}
+
 logging:
   level:
     com.project926.backend: DEBUG

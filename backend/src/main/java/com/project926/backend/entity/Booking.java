@@ -11,12 +11,11 @@ import java.util.UUID;
 
 /**
  * Maps to the existing {@code bookings} table (see supabase/schema.sql).
- * Phase D only maps the columns this phase actually reads — checked_in_at/
- * checked_in_by (Phase E check-in) and ticket_email_sent_at/
- * ticket_email_error (Phase F email) are intentionally NOT mapped here;
- * Hibernate's {@code ddl-auto=validate} only validates columns that ARE
- * mapped, so omitting them is safe and avoids scope creep into later
- * phases' concerns.
+ * checked_in_at/checked_in_by (a later, not-yet-migrated check-in phase)
+ * are still intentionally NOT mapped here; Hibernate's
+ * {@code ddl-auto=validate} only validates columns that ARE mapped, so
+ * omitting them is safe and avoids scope creep into that phase's concerns.
+ * ticket_email_sent_at/ticket_email_error (Phase E) are now mapped.
  *
  * No entity mutation happens for status/total_amount/qr_code — those are
  * exclusively written by the existing create_booking_from_items /
@@ -56,6 +55,12 @@ public class Booking {
 
     @Column(name = "expires_at")
     private OffsetDateTime expiresAt;
+
+    @Column(name = "ticket_email_sent_at")
+    private OffsetDateTime ticketEmailSentAt;
+
+    @Column(name = "ticket_email_error")
+    private String ticketEmailError;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -97,6 +102,14 @@ public class Booking {
 
     public OffsetDateTime getExpiresAt() {
         return expiresAt;
+    }
+
+    public OffsetDateTime getTicketEmailSentAt() {
+        return ticketEmailSentAt;
+    }
+
+    public String getTicketEmailError() {
+        return ticketEmailError;
     }
 
     public OffsetDateTime getCreatedAt() {

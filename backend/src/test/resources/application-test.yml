@@ -18,3 +18,14 @@ razorpay:
   key-id: rzp_test_dummy_key_id
   key-secret: dummy_test_secret
   public-key-id: rzp_test_dummy_key_id
+
+# Dummy values only — ResendGateway's constructor just stores these, no
+# network call happens until sendEmail() is actually invoked (never is, in
+# any @WebMvcTest slice — PaymentService is always @MockBean'd there).
+resend:
+  api-key: dummy_test_resend_key
+  from-email: "Test <test@example.com>"
+  reply-to: ""
+
+app:
+  public-url: http://localhost:3000

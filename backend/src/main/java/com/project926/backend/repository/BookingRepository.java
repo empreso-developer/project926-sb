@@ -32,4 +32,29 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Transactional
     @Query("UPDATE Booking b SET b.status = :status WHERE b.id = :id")
     void updateStatus(@Param("id") UUID id, @Param("status") String status);
+
+    /**
+     * Mirrors sendBookingConfirmationEmailOnce's atomic claim exactly:
+     * {@code .update({ ticket_email_sent_at }).eq('id', booking.id).is('ticket_email_sent_at', null)}
+     * — a single conditional UPDATE, not read-then-write, so two concurrent
+     * or retried verification requests for the same booking can never both
+     * win the claim. Returns the number of rows updated (0 or 1) so the
+     * caller can tell whether IT won the claim, exactly like the existing
+     * code checking whether {@code claim.data} came back non-null.
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Booking b SET b.ticketEmailSentAt = :sentAt WHERE b.id = :id AND b.ticketEmailSentAt IS NULL")
+    int claimTicketEmailSend(@Param("id") UUID id, @Param("sentAt") OffsetDateTime sentAt);
+
+    /**
+     * Mirrors the catch block's
+     * {@code .update({ ticket_email_error: message.slice(0, 500) }).eq('id', booking.id)}.
+     * Truncation to 500 chars happens in the caller (TicketEmailService),
+     * matching the existing {@code .slice(0, 500)} call site exactly.
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Booking b SET b.ticketEmailError = :error WHERE b.id = :id")
+    void recordTicketEmailError(@Param("id") UUID id, @Param("error") String error);
 }
