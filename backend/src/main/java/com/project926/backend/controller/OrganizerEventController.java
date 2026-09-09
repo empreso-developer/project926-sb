@@ -6,8 +6,10 @@ import com.project926.backend.dto.CheckInResponse;
 import com.project926.backend.dto.CreateEventRequest;
 import com.project926.backend.dto.CreateTicketTypeRequest;
 import com.project926.backend.dto.EventDto;
+import com.project926.backend.dto.EventScanDto;
 import com.project926.backend.dto.TicketTypeDto;
 import com.project926.backend.dto.UpdateEventRequest;
+import com.project926.backend.entity.Event;
 import com.project926.backend.exception.EventNotFoundException;
 import com.project926.backend.exception.ForbiddenException;
 import com.project926.backend.service.AttendeeService;
@@ -144,6 +146,23 @@ public class OrganizerEventController {
         @RequestParam(name = "q", required = false) String search
     ) {
         return attendeeService.listAttendees(eventId, jwt.getSubject(), page, filter, search);
+    }
+
+    /**
+     * Mirrors lib/auth/server.ts#requireEventOrganizer's two responsibilities
+     * for the organizer scan page (see scan/page.tsx): authorization
+     * (owner-or-admin, via the shared requireEventOrganizerOrAdmin — same
+     * check the attendees/check-in endpoints above and below already use,
+     * not duplicated here) and the minimal event info the page displays.
+     * A plain 404/403 (via EventNotFoundException/ForbiddenException,
+     * mapped by GlobalExceptionHandler) is intentional here — unlike
+     * checkIn() below, this endpoint has no special response-shape
+     * requirement, so there is no reason to catch and re-wrap those.
+     */
+    @GetMapping("/{eventId}/scan")
+    public EventScanDto getEventForScan(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID eventId) {
+        Event event = eventService.requireEventOrganizerOrAdmin(eventId, jwt.getSubject());
+        return new EventScanDto(event.getId(), event.getTitle());
     }
 
     /**

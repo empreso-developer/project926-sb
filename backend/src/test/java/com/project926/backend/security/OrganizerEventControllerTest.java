@@ -6,6 +6,7 @@ import com.project926.backend.dto.AttendeeListResponse;
 import com.project926.backend.dto.AttendeeStatsDto;
 import com.project926.backend.dto.CheckInResponse;
 import com.project926.backend.dto.EventDto;
+import com.project926.backend.entity.Event;
 import com.project926.backend.exception.EventNotFoundException;
 import com.project926.backend.exception.ForbiddenException;
 import com.project926.backend.exception.GlobalExceptionHandler;
@@ -23,6 +24,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -405,5 +407,99 @@ class OrganizerEventControllerTest {
                     """.formatted(bookingId)))
             .andExpect(status().isOk())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("wrong_event"));
+    }
+
+    // ---- Scan-page event lookup (organizer-or-admin) ----------------------
+
+    private Event event(UUID id, String title, String organizerId) {
+        Event e = newInstance(Event.class);
+        set(e, "id", id);
+        set(e, "organizerId", organizerId);
+        set(e, "title", title);
+        set(e, "status", "approved");
+        set(e, "createdAt", OffsetDateTime.now());
+        set(e, "updatedAt", OffsetDateTime.now());
+        return e;
+    }
+
+    private static void set(Object target, String field, Object value) {
+        try {
+            Field f = target.getClass().getDeclaredField(field);
+            f.setAccessible(true);
+            f.set(target, value);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static <T> T newInstance(Class<T> type) {
+        try {
+            var constructor = type.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void getEventForScan_withoutToken_returns401() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        mockMvc.perform(get("/api/v1/organizer/events/" + eventId + "/scan"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getEventForScan_organizerOwnEvent_returns200_withMinimalDto() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        when(eventService.requireEventOrganizerOrAdmin(eventId, CALLER_ID))
+            .thenReturn(event(eventId, "Organizer's Own Event", CALLER_ID));
+
+        mockMvc.perform(get("/api/v1/organizer/events/" + eventId + "/scan")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID))))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.id").value(eventId.toString()))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.title").value("Organizer's Own Event"));
+    }
+
+    @Test
+    void getEventForScan_organizerAnotherOrganizersEvent_returns403() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        when(eventService.requireEventOrganizerOrAdmin(eventId, CALLER_ID))
+            .thenThrow(new ForbiddenException("Forbidden"));
+
+        mockMvc.perform(get("/api/v1/organizer/events/" + eventId + "/scan")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID))))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getEventForScan_adminAnotherOrganizersEvent_returns200() throws Exception {
+        // The controller trusts EventService.requireEventOrganizerOrAdmin's
+        // own admin-bypass decision (already proven against the real dev DB
+        // by AttendeeListingIT, which exercises the identical shared check)
+        // — here we only prove the CONTROLLER honors whatever that method
+        // returns, by mocking a successful admin-bypass outcome for an
+        // event this caller does not own.
+        UUID eventId = UUID.randomUUID();
+        String adminId = "user_admin0000000000000000";
+        when(eventService.requireEventOrganizerOrAdmin(eventId, adminId))
+            .thenReturn(event(eventId, "Someone Else's Event", "user_someOtherOrganizer000"));
+
+        mockMvc.perform(get("/api/v1/organizer/events/" + eventId + "/scan")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(adminId).claim(SUB, adminId))))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.title").value("Someone Else's Event"));
+    }
+
+    @Test
+    void getEventForScan_unknownEvent_returns404() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        when(eventService.requireEventOrganizerOrAdmin(eventId, CALLER_ID))
+            .thenThrow(new EventNotFoundException(eventId));
+
+        mockMvc.perform(get("/api/v1/organizer/events/" + eventId + "/scan")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID))))
+            .andExpect(status().isNotFound());
     }
 }

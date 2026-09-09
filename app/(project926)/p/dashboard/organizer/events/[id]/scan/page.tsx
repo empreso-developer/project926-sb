@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, Users } from 'lucide-react';
-import { requireEventOrganizer } from '@/lib/auth/server';
+import { backendFetch, BackendApiError } from '@/lib/backend/client';
 import { Button } from '@/components/ui/button';
 import { TicketScanner } from '@/components/organizer/ticket-scanner';
 
@@ -9,16 +9,36 @@ interface ScanPageProps {
   params: Promise<{ id: string }>;
 }
 
+interface EventScanInfo {
+  id: string;
+  title: string;
+}
+
+/**
+ * Migrated off lib/auth/server.ts#requireEventOrganizer (the last remaining
+ * Supabase dependency in the scan flow — QR scanning/check-in itself was
+ * already fully migrated to Spring, see components/organizer/ticket-scanner.tsx
+ * and the check-in proxy route). Now calls Spring's
+ * GET /api/v1/organizer/events/{eventId}/scan (OrganizerEventController),
+ * which reuses the exact same EventService.requireEventOrganizerOrAdmin
+ * authorization the check-in/attendees endpoints already use — owner OR
+ * admin, identical semantics to the function this replaces. A 401 from
+ * backendFetch (no session) redirects to sign-in; a 403/404 (forbidden or
+ * event not found) collapses to notFound(), preserving this page's
+ * existing observable behavior of not distinguishing the two.
+ */
 export default async function ScanTicketsPage({ params }: ScanPageProps) {
   const eventId = (await params).id;
 
-  let event;
+  let event: EventScanInfo;
   try {
-    ({ event } = await requireEventOrganizer(eventId));
+    event = await backendFetch<EventScanInfo>(`/api/v1/organizer/events/${eventId}/scan`);
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Forbidden';
-    if (message === 'Not authenticated') redirect('/p/sign-in');
-    notFound();
+    if (err instanceof BackendApiError) {
+      if (err.status === 401) redirect('/p/sign-in');
+      notFound();
+    }
+    throw err;
   }
 
   return (
