@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Mirrors GET /project926/api/profile. Requires authentication (enforced by
+ * Mirrors GET /p/api/profile. Requires authentication (enforced by
  * SecurityConfig's default anyRequest().authenticated() — no request
  * mapping here permits unauthenticated access). The Clerk user id comes
  * only from the validated JWT's `sub` claim, never from any client-supplied

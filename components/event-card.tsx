@@ -19,7 +19,7 @@ export function EventCard({ event, className }: EventCardProps) {
 
   return (
     <Link
-      href={`/project926/events/${event.id}`}
+      href={`/p/events/${event.id}`}
       className={className}
     >
       <Card className="group overflow-hidden border-border/60 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-glow">

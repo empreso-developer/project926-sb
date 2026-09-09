@@ -86,7 +86,7 @@ export default async function AttendeesPage({ params, searchParams }: AttendeesP
     ]);
   } catch (err) {
     if (err instanceof BackendApiError) {
-      if (err.status === 401) redirect('/project926/sign-in');
+      if (err.status === 401) redirect('/p/sign-in');
       notFound();
     }
     throw err;
@@ -106,13 +106,13 @@ export default async function AttendeesPage({ params, searchParams }: AttendeesP
       else next.set(key, value);
     }
     const qs = next.toString();
-    return `/project926/dashboard/organizer/events/${eventId}/attendees${qs ? `?${qs}` : ''}`;
+    return `/p/dashboard/organizer/events/${eventId}/attendees${qs ? `?${qs}` : ''}`;
   };
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
-        <Link href={`/project926/dashboard/organizer/events/${eventId}`}>
+        <Link href={`/p/dashboard/organizer/events/${eventId}`}>
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           Back to event
         </Link>
@@ -125,10 +125,10 @@ export default async function AttendeesPage({ params, searchParams }: AttendeesP
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link href={`/project926/dashboard/organizer/events/${eventId}`}>Manage event</Link>
+            <Link href={`/p/dashboard/organizer/events/${eventId}`}>Manage event</Link>
           </Button>
           <Button asChild>
-            <Link href={`/project926/dashboard/organizer/events/${eventId}/scan`}>
+            <Link href={`/p/dashboard/organizer/events/${eventId}/scan`}>
               <QrCode className="mr-1.5 h-4 w-4" />
               Scan tickets
             </Link>

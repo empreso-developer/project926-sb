@@ -47,7 +47,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Mirrors app/(project926)/project926/api/payments/create-order/route.ts
+ * Mirrors app/(project926)/p/api/payments/create-order/route.ts
  * and .../payments/verify/route.ts, unit-level: every repository and
  * RazorpayGateway call is mocked, so this never touches a real database or
  * a real Razorpay endpoint (Step 21's explicit requirement).
@@ -55,18 +55,26 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
 
-    @Mock private EventRepository eventRepository;
-    @Mock private TicketTypeRepository ticketTypeRepository;
-    @Mock private BookingRepository bookingRepository;
-    @Mock private PaymentRepository paymentRepository;
-    @Mock private BookingInventoryRepository bookingInventoryRepository;
-    @Mock private RazorpayGateway razorpayGateway;
-    @Mock private QrCodeGenerator qrCodeGenerator;
-    @Mock private TicketEmailService ticketEmailService;
+    @Mock
+    private EventRepository eventRepository;
+    @Mock
+    private TicketTypeRepository ticketTypeRepository;
+    @Mock
+    private BookingRepository bookingRepository;
+    @Mock
+    private PaymentRepository paymentRepository;
+    @Mock
+    private BookingInventoryRepository bookingInventoryRepository;
+    @Mock
+    private RazorpayGateway razorpayGateway;
+    @Mock
+    private QrCodeGenerator qrCodeGenerator;
+    @Mock
+    private TicketEmailService ticketEmailService;
 
     private PaymentService service() {
         return new PaymentService(eventRepository, ticketTypeRepository, bookingRepository,
-            paymentRepository, bookingInventoryRepository, razorpayGateway, qrCodeGenerator, ticketEmailService);
+                paymentRepository, bookingInventoryRepository, razorpayGateway, qrCodeGenerator, ticketEmailService);
     }
 
     private static final String CUSTOMER_ID = "user_customer000000000000";
@@ -101,7 +109,8 @@ class PaymentServiceTest {
         return b;
     }
 
-    private Payment payment(UUID id, UUID bookingId, String razorpayOrderId, BigDecimal amount, String currency, String status) {
+    private Payment payment(UUID id, UUID bookingId, String razorpayOrderId, BigDecimal amount, String currency,
+            String status) {
         Payment p = newInstance(Payment.class);
         set(p, "id", id);
         set(p, "bookingId", bookingId);
@@ -134,9 +143,9 @@ class PaymentServiceTest {
         when(eventRepository.findById(eventId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().createOrder(CUSTOMER_ID,
-            new CreateOrderRequest(eventId, List.of(item(UUID.randomUUID(), 1)))))
-            .isInstanceOf(PaymentFlowNotFoundException.class)
-            .hasMessage("Event not found");
+                new CreateOrderRequest(eventId, List.of(item(UUID.randomUUID(), 1)))))
+                .isInstanceOf(PaymentFlowNotFoundException.class)
+                .hasMessage("Event not found");
     }
 
     @Test
@@ -145,9 +154,9 @@ class PaymentServiceTest {
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(event(eventId, "draft")));
 
         assertThatThrownBy(() -> service().createOrder(CUSTOMER_ID,
-            new CreateOrderRequest(eventId, List.of(item(UUID.randomUUID(), 1)))))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("Event is not available for booking");
+                new CreateOrderRequest(eventId, List.of(item(UUID.randomUUID(), 1)))))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("Event is not available for booking");
     }
 
     @Test
@@ -158,9 +167,9 @@ class PaymentServiceTest {
         when(ticketTypeRepository.findAllById(List.of(ttId))).thenReturn(List.of()); // none found
 
         assertThatThrownBy(() -> service().createOrder(CUSTOMER_ID,
-            new CreateOrderRequest(eventId, List.of(item(ttId, 1)))))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("One or more ticket types not found");
+                new CreateOrderRequest(eventId, List.of(item(ttId, 1)))))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("One or more ticket types not found");
     }
 
     @Test
@@ -169,12 +178,12 @@ class PaymentServiceTest {
         UUID ttId = UUID.randomUUID();
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(event(eventId, "approved")));
         when(ticketTypeRepository.findAllById(List.of(ttId)))
-            .thenReturn(List.of(ticketType(ttId, "VIP", new BigDecimal("100.00"), 10, 8))); // 2 remaining
+                .thenReturn(List.of(ticketType(ttId, "VIP", new BigDecimal("100.00"), 10, 8))); // 2 remaining
 
         assertThatThrownBy(() -> service().createOrder(CUSTOMER_ID,
-            new CreateOrderRequest(eventId, List.of(item(ttId, 5)))))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("Only 2 tickets left for VIP");
+                new CreateOrderRequest(eventId, List.of(item(ttId, 5)))))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("Only 2 tickets left for VIP");
     }
 
     @Test
@@ -184,15 +193,15 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(event(eventId, "approved")));
         when(ticketTypeRepository.findAllById(List.of(ttId)))
-            .thenReturn(List.of(ticketType(ttId, "General", new BigDecimal("250.50"), 100, 0)));
+                .thenReturn(List.of(ticketType(ttId, "General", new BigDecimal("250.50"), 100, 0)));
         when(bookingInventoryRepository.createBookingFromItems(eq(CUSTOMER_ID), eq(eventId), anyString()))
-            .thenReturn(bookingId);
+                .thenReturn(bookingId);
         when(razorpayGateway.createOrder(eq(50100L), eq("INR"), anyString(), anyMap()))
-            .thenReturn(new Order(new JSONObject().put("id", "order_abc123")));
+                .thenReturn(new Order(new JSONObject().put("id", "order_abc123")));
         when(razorpayGateway.getPublicKeyId()).thenReturn("rzp_test_public");
 
         CreateOrderResponse response = service().createOrder(CUSTOMER_ID,
-            new CreateOrderRequest(eventId, List.of(item(ttId, 2)))); // 2 * 250.50 = 501.00 -> 50100 paise
+                new CreateOrderRequest(eventId, List.of(item(ttId, 2)))); // 2 * 250.50 = 501.00 -> 50100 paise
 
         assertThat(response.orderId()).isEqualTo("order_abc123");
         assertThat(response.bookingId()).isEqualTo(bookingId);
@@ -208,8 +217,8 @@ class PaymentServiceTest {
         // all, so the server-side price lookup above is the only source —
         // this is enforced by the DTO shape, not a runtime check.
         assertThat(CreateOrderRequest.class.getRecordComponents())
-            .extracting(java.lang.reflect.RecordComponent::getName)
-            .containsExactly("eventId", "items");
+                .extracting(java.lang.reflect.RecordComponent::getName)
+                .containsExactly("eventId", "items");
     }
 
     @Test
@@ -219,15 +228,15 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(event(eventId, "approved")));
         when(ticketTypeRepository.findAllById(List.of(ttId)))
-            .thenReturn(List.of(ticketType(ttId, "General", new BigDecimal("100.00"), 100, 0)));
+                .thenReturn(List.of(ticketType(ttId, "General", new BigDecimal("100.00"), 100, 0)));
         when(bookingInventoryRepository.createBookingFromItems(eq(CUSTOMER_ID), eq(eventId), anyString()))
-            .thenReturn(bookingId);
+                .thenReturn(bookingId);
         when(razorpayGateway.createOrder(anyLong(), anyString(), anyString(), anyMap()))
-            .thenThrow(new RazorpayException("network error"));
+                .thenThrow(new RazorpayException("network error"));
 
         assertThatThrownBy(() -> service().createOrder(CUSTOMER_ID,
-            new CreateOrderRequest(eventId, List.of(item(ttId, 1)))))
-            .isInstanceOf(IllegalStateException.class);
+                new CreateOrderRequest(eventId, List.of(item(ttId, 1)))))
+                .isInstanceOf(IllegalStateException.class);
 
         // The booking RPC already committed independently before the
         // Razorpay call — no compensating cancellation exists, matching
@@ -244,30 +253,30 @@ class PaymentServiceTest {
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(PaymentFlowNotFoundException.class)
-            .hasMessage("Booking not found");
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(PaymentFlowNotFoundException.class)
+                .hasMessage("Booking not found");
     }
 
     @Test
     void verifyPayment_notOwnedByCaller_throwsForbidden() {
         UUID bookingId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, "user_someoneElse000000000", "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, "user_someoneElse000000000", "pending", "BK-1", null)));
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(ForbiddenException.class);
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
     void verifyPayment_alreadyConfirmed_returnsIdempotentSuccess_withoutTouchingRazorpay() {
         UUID bookingId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "confirmed", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "confirmed", "BK-1", null)));
 
         VerifyPaymentResponse response = service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
 
         assertThat(response.success()).isTrue();
         assertThat(response.reference()).isEqualTo("BK-1");
@@ -279,25 +288,25 @@ class PaymentServiceTest {
     void verifyPayment_cancelledBooking_throwsBookingValidationWithDynamicStatus() {
         UUID bookingId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "cancelled", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "cancelled", "BK-1", null)));
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("Booking is cancelled and cannot be verified");
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("Booking is cancelled and cannot be verified");
     }
 
     @Test
     void verifyPayment_noPaymentRecord_throwsBookingValidation() {
         UUID bookingId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("No payment record found for this booking");
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("No payment record found for this booking");
     }
 
     @Test
@@ -305,15 +314,16 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature("order_x", "pay_x", "sig_x")).thenReturn(false);
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("Signature verification failed");
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("Signature verification failed");
 
         verify(paymentRepository).updateStatus(paymentId, "failed");
         verify(bookingRepository).updateStatus(bookingId, "cancelled");
@@ -324,15 +334,16 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_DIFFERENT", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional.of(
+                        payment(paymentId, bookingId, "order_DIFFERENT", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("Order does not match booking");
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("Order does not match booking");
 
         verify(paymentRepository).updateStatus(paymentId, "failed");
     }
@@ -342,15 +353,16 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         when(razorpayGateway.fetchPayment("pay_x")).thenThrow(new RazorpayException("timeout"));
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(RazorpayGatewayException.class);
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(RazorpayGatewayException.class);
 
         // Critical: no rejectPayment on a gateway-fetch failure, matching
         // the existing route exactly.
@@ -363,16 +375,17 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_DIFFERENT", "captured", 50000, "INR"));
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("Payment/order mismatch");
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("Payment/order mismatch");
 
         verify(paymentRepository).updateStatus(paymentId, "failed");
         verify(bookingRepository).updateStatus(bookingId, "cancelled");
@@ -383,16 +396,17 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_x", "authorized", 50000, "INR"));
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("Payment was not captured");
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("Payment was not captured");
     }
 
     @Test
@@ -400,17 +414,18 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         // Expected 50000 paise (500.00 INR), Razorpay says 40000.
         when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_x", "captured", 40000, "INR"));
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("Payment amount mismatch");
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("Payment amount mismatch");
     }
 
     @Test
@@ -418,34 +433,37 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_x", "captured", 50000, "USD"));
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(BookingValidationException.class)
-            .hasMessage("Payment amount mismatch");
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(BookingValidationException.class)
+                .hasMessage("Payment amount mismatch");
     }
 
     @Test
-    void verifyPayment_soldOutDuringConfirmation_marksPaymentPaidAndCancelsBooking_thenThrows() throws RazorpayException {
+    void verifyPayment_soldOutDuringConfirmation_marksPaymentPaidAndCancelsBooking_thenThrows()
+            throws RazorpayException {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_x", "captured", 50000, "INR"));
         when(bookingInventoryRepository.confirmBookingAndCommitInventory(eq(bookingId), any()))
-            .thenThrow(new SoldOutException("SOLD_OUT: not enough tickets remaining"));
+                .thenThrow(new SoldOutException("SOLD_OUT: not enough tickets remaining"));
 
         assertThatThrownBy(() -> service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
-            .isInstanceOf(SoldOutException.class);
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId)))
+                .isInstanceOf(SoldOutException.class);
 
         // Money is real (captured) -> payment marked paid even though the
         // booking itself is cancelled, exactly matching the existing route.
@@ -461,14 +479,15 @@ class PaymentServiceTest {
         String fakeQrDataUrl = "data:image/png;base64,ZmFrZS1xci1ieXRlcw==";
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(pendingBooking));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_x", "captured", 50000, "INR"));
         when(qrCodeGenerator.generateDataUrl("BK-1", bookingId, pendingBooking.getEventId())).thenReturn(fakeQrDataUrl);
         when(bookingInventoryRepository.confirmBookingAndCommitInventory(bookingId, fakeQrDataUrl)).thenReturn(true);
 
         VerifyPaymentResponse response = service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
 
         assertThat(response.success()).isTrue();
         assertThat(response.bookingId()).isEqualTo(bookingId);
@@ -490,7 +509,8 @@ class PaymentServiceTest {
         Booking pendingBooking = booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null);
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(pendingBooking));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_x", "captured", 50000, "INR"));
         when(bookingInventoryRepository.confirmBookingAndCommitInventory(any(), any())).thenReturn(true);
@@ -499,10 +519,10 @@ class PaymentServiceTest {
         // where it somehow does, proving PaymentService's own try/catch
         // still protects the response.
         org.mockito.Mockito.doThrow(new RuntimeException("resend down"))
-            .when(ticketEmailService).sendBookingConfirmationEmailOnce(any(), any());
+                .when(ticketEmailService).sendBookingConfirmationEmailOnce(any(), any());
 
         VerifyPaymentResponse response = service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
 
         assertThat(response.success()).isTrue();
         verify(paymentRepository).markPaid(paymentId, "pay_x", "sig_x", "paid");
@@ -516,15 +536,16 @@ class PaymentServiceTest {
         UUID bookingId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         when(bookingRepository.findById(bookingId))
-            .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
+                .thenReturn(Optional.of(booking(bookingId, CUSTOMER_ID, "pending", "BK-1", null)));
         when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId))
-            .thenReturn(Optional.of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
+                .thenReturn(Optional
+                        .of(payment(paymentId, bookingId, "order_x", new BigDecimal("500.00"), "INR", "created")));
         when(razorpayGateway.verifySignature(any(), any(), any())).thenReturn(true);
         when(razorpayGateway.fetchPayment("pay_x")).thenReturn(rpPayment("order_x", "captured", 50000, "INR"));
         when(bookingInventoryRepository.confirmBookingAndCommitInventory(eq(bookingId), any())).thenReturn(false);
 
         VerifyPaymentResponse response = service().verifyPayment(CUSTOMER_ID,
-            new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
+                new VerifyPaymentRequest("order_x", "pay_x", "sig_x", bookingId));
 
         assertThat(response.success()).isTrue();
         verify(paymentRepository).markPaid(paymentId, "pay_x", "sig_x", "paid");

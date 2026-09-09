@@ -48,7 +48,7 @@ export default async function EventDetailsPage({ params }: EventPageProps) {
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <Button asChild variant="ghost" size="sm" className="mb-6 -ml-2">
-        <Link href="/project926">
+        <Link href="/p">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           Back to events
         </Link>

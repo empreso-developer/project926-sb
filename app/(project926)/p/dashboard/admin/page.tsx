@@ -151,7 +151,7 @@ export default async function AdminDashboard() {
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <Button asChild variant="outline" size="sm">
-                      <Link href={`/project926/events/${e.id}`} target="_blank">
+                      <Link href={`/p/events/${e.id}`} target="_blank">
                         Preview
                       </Link>
                     </Button>
@@ -205,7 +205,7 @@ export default async function AdminDashboard() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Link
-                          href={`/project926/events/${e.id}`}
+                          href={`/p/events/${e.id}`}
                           className="rounded-md p-2 hover:bg-muted transition-colors"
                           title="View event"
                         >

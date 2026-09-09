@@ -20,21 +20,21 @@ import { supabaseAdmin } from '@/lib/supabase/server';
 
 export async function approveEventAction(eventId: string) {
   await backendFetch(`/api/v1/admin/events/${eventId}/approve`, { method: 'POST' });
-  revalidatePath('/project926/dashboard/admin');
-  revalidatePath(`/project926/events/${eventId}`);
-  revalidatePath('/project926');
+  revalidatePath('/p/dashboard/admin');
+  revalidatePath(`/p/events/${eventId}`);
+  revalidatePath('/p');
 }
 
 export async function rejectEventAction(eventId: string) {
   await backendFetch(`/api/v1/admin/events/${eventId}/reject`, { method: 'POST' });
-  revalidatePath('/project926/dashboard/admin');
-  revalidatePath('/project926');
+  revalidatePath('/p/dashboard/admin');
+  revalidatePath('/p');
 }
 
 export async function removeEventAction(eventId: string) {
   await backendFetch(`/api/v1/admin/events/${eventId}`, { method: 'DELETE' });
-  revalidatePath('/project926/dashboard/admin');
-  revalidatePath('/project926');
+  revalidatePath('/p/dashboard/admin');
+  revalidatePath('/p');
 }
 
 export async function updateProfileRoleAction(profileId: string, role: 'customer' | 'organizer' | 'admin') {
@@ -52,5 +52,5 @@ export async function updateProfileRoleAction(profileId: string, role: 'customer
     .update({ role })
     .eq('id', profileId);
   if (error) throw error;
-  revalidatePath('/project926/dashboard/admin');
+  revalidatePath('/p/dashboard/admin');
 }

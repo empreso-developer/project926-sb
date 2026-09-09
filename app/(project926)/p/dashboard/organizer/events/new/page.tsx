@@ -7,7 +7,7 @@ export default function NewEventPage() {
   return (
     <div className="container mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
-        <Link href="/project926/dashboard/organizer">
+        <Link href="/p/dashboard/organizer">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           Back to dashboard
         </Link>

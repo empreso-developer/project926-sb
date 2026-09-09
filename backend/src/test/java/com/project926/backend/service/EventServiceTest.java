@@ -34,11 +34,11 @@ import static org.mockito.Mockito.when;
 /**
  * Proves EventService reproduces the two existing Next.js queries at the
  * data-access level, independent of any mocked HTTP layer:
- *   - listApprovedEvents(): status='approved', ordered by event_date asc
- *     (app/(project926)/project926/page.tsx#getApprovedEvents)
- *   - getEventById(): looked up by id with NO status filter — any event is
- *     readable by id today, same as the existing event-detail page
- *     (app/(project926)/project926/events/[id]/page.tsx#getEvent)
+ * - listApprovedEvents(): status='approved', ordered by event_date asc
+ * (app/(project926)/p/page.tsx#getApprovedEvents)
+ * - getEventById(): looked up by id with NO status filter — any event is
+ * readable by id today, same as the existing event-detail page
+ * (app/(project926)/p/events/[id]/page.tsx#getEvent)
  */
 @ExtendWith(MockitoExtension.class)
 class EventServiceTest {
@@ -102,7 +102,7 @@ class EventServiceTest {
         when(eventRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getEventById(id))
-            .isInstanceOf(EventNotFoundException.class);
+                .isInstanceOf(EventNotFoundException.class);
     }
 
     @Test
@@ -126,11 +126,13 @@ class EventServiceTest {
     // ---- Phase C: organizer-owned write operations ----------------------
 
     private CreateEventRequest createRequest() {
-        return new CreateEventRequest("Title", "desc", LocalDate.of(2026, 12, 1), LocalTime.of(19, 0), "Venue", "City", null);
+        return new CreateEventRequest("Title", "desc", LocalDate.of(2026, 12, 1), LocalTime.of(19, 0), "Venue", "City",
+                null);
     }
 
     private UpdateEventRequest updateRequest() {
-        return new UpdateEventRequest("New Title", "new desc", LocalDate.of(2027, 1, 1), LocalTime.of(20, 0), "New Venue", "New City", null);
+        return new UpdateEventRequest("New Title", "new desc", LocalDate.of(2027, 1, 1), LocalTime.of(20, 0),
+                "New Venue", "New City", null);
     }
 
     @Test
@@ -138,7 +140,7 @@ class EventServiceTest {
         service = service();
         String organizerId = "user_organizer00000000000";
         when(eventRepository.save(org.mockito.ArgumentMatchers.any(Event.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+                .thenAnswer(inv -> inv.getArgument(0));
         when(ticketTypeRepository.findByEventId(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
 
         EventDto result = service.createEvent(organizerId, createRequest());
@@ -153,10 +155,10 @@ class EventServiceTest {
         service = service();
         String customerId = "user_customer000000000000";
         doThrow(new ForbiddenException("Requires organizer or admin role"))
-            .when(profileService).requireOrganizerOrAdminRole(customerId);
+                .when(profileService).requireOrganizerOrAdminRole(customerId);
 
         assertThatThrownBy(() -> service.createEvent(customerId, createRequest()))
-            .isInstanceOf(ForbiddenException.class);
+                .isInstanceOf(ForbiddenException.class);
         verify(eventRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
@@ -184,7 +186,7 @@ class EventServiceTest {
         when(eventRepository.findById(id)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.updateEvent(id, "user_someoneElse000000000", updateRequest()))
-            .isInstanceOf(ForbiddenException.class);
+                .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
@@ -194,7 +196,7 @@ class EventServiceTest {
         when(eventRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateEvent(id, "user_owner0000000000000000", updateRequest()))
-            .isInstanceOf(EventNotFoundException.class);
+                .isInstanceOf(EventNotFoundException.class);
     }
 
     @Test
@@ -218,7 +220,7 @@ class EventServiceTest {
         when(eventRepository.findById(id)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.deleteEvent(id, "user_someoneElse000000000"))
-            .isInstanceOf(ForbiddenException.class);
+                .isInstanceOf(ForbiddenException.class);
         verify(eventRepository, never()).delete(org.mockito.ArgumentMatchers.any(Event.class));
     }
 
@@ -250,7 +252,7 @@ class EventServiceTest {
         when(eventRepository.findById(id)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.getOwnEventById(id, "user_someoneElse000000000"))
-            .isInstanceOf(EventNotFoundException.class);
+                .isInstanceOf(EventNotFoundException.class);
     }
 
     private Event event(UUID id, String status) {
@@ -285,7 +287,10 @@ class EventServiceTest {
         return t;
     }
 
-    /** Entities have no setters and a protected no-arg constructor by design (JPA-managed); reflection is only for building fixtures in this test. */
+    /**
+     * Entities have no setters and a protected no-arg constructor by design
+     * (JPA-managed); reflection is only for building fixtures in this test.
+     */
     private static void set(Object target, String field, Object value) {
         try {
             Field f = target.getClass().getDeclaredField(field);

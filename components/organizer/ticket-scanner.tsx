@@ -67,7 +67,7 @@ export function TicketScanner({ eventId }: { eventId: string }) {
       submittingRef.current = true;
       setPhase('submitting');
       try {
-        const res = await fetch(`/project926/api/organizer/events/${eventId}/check-in`, {
+        const res = await fetch(`/p/api/organizer/events/${eventId}/check-in`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

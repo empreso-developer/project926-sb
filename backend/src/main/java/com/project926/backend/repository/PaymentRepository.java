@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +18,18 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
      * Spring Data derives the LIMIT 1 from the "First" keyword.
      */
     Optional<Payment> findFirstByBookingIdOrderByCreatedAtDesc(UUID bookingId);
+
+    /**
+     * Batch-fetch for a set of bookings (customer bookings list — avoids
+     * N+1). Every booking has AT MOST one payment row in practice, but not
+     * guaranteed to have exactly one: PaymentService.createOrder can leave
+     * a booking with zero payment rows if the Razorpay order-creation call
+     * itself fails after the booking was already created (no compensating
+     * cleanup — see PaymentService's class Javadoc). CustomerBookingService
+     * picks the most-recent row per booking id from this result, mirroring
+     * findFirstByBookingIdOrderByCreatedAtDesc's semantics for a batch.
+     */
+    List<Payment> findByBookingIdIn(List<UUID> bookingIds);
 
     /**
      * The Razorpay webhook's (Phase G) sole correlation path: every payment

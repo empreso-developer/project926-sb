@@ -20,7 +20,7 @@ import java.io.IOException;
  * Public, machine-to-machine Razorpay webhook endpoint (Phase G) —
  * deliberately NOT behind Clerk authentication (see SecurityConfig's
  * narrowly-scoped permitAll for exactly this one path). The eventual
- * public URL (https://empreso.in/project926/api/webhooks/razorpay, per a
+ * public URL (https://empreso.in/p/api/webhooks/razorpay, per a
  * reverse proxy not configured in this phase) is expected to map onto
  * this endpoint, following the same {@code /api/v1/*} convention every
  * other endpoint in this migration already uses — no deployment/routing
@@ -45,17 +45,17 @@ import java.io.IOException;
  * Chosen so Razorpay's automatic retry behavior is only ever exercised
  * where retrying could actually help:
  * <ul>
- *   <li>400 — invalid/missing signature, or a malformed/incomplete body
- *       that passed signature verification (both permanent conditions;
- *       retrying an identical delivery reaches the identical result).</li>
- *   <li>200 — every other outcome, including business states the service
- *       intentionally leaves unactioned (unknown event, no correlation,
- *       stale booking state, SOLD_OUT) — these are fully handled/logged
- *       already, not failures.</li>
- *   <li>500 — an unexpected internal failure while processing a
- *       recognized event (e.g. a database error, or an unexpected RPC
- *       failure surfaced as BookingConfirmationException) — genuinely
- *       worth Razorpay retrying.</li>
+ * <li>400 — invalid/missing signature, or a malformed/incomplete body
+ * that passed signature verification (both permanent conditions;
+ * retrying an identical delivery reaches the identical result).</li>
+ * <li>200 — every other outcome, including business states the service
+ * intentionally leaves unactioned (unknown event, no correlation,
+ * stale booking state, SOLD_OUT) — these are fully handled/logged
+ * already, not failures.</li>
+ * <li>500 — an unexpected internal failure while processing a
+ * recognized event (e.g. a database error, or an unexpected RPC
+ * failure surfaced as BookingConfirmationException) — genuinely
+ * worth Razorpay retrying.</li>
  * </ul>
  * Never logs the webhook secret, the signature value, or the full raw
  * payload — only event name and, once parsed, the safe Razorpay order/
@@ -73,10 +73,9 @@ public class RazorpayWebhookController {
     private final ObjectMapper objectMapper;
 
     public RazorpayWebhookController(
-        RazorpayWebhookSignatureVerifier signatureVerifier,
-        RazorpayWebhookService webhookService,
-        ObjectMapper objectMapper
-    ) {
+            RazorpayWebhookSignatureVerifier signatureVerifier,
+            RazorpayWebhookService webhookService,
+            ObjectMapper objectMapper) {
         this.signatureVerifier = signatureVerifier;
         this.webhookService = webhookService;
         this.objectMapper = objectMapper;
@@ -84,9 +83,8 @@ public class RazorpayWebhookController {
 
     @PostMapping
     public ResponseEntity<Void> handleWebhook(
-        @RequestBody byte[] rawBody,
-        @RequestHeader(value = "X-Razorpay-Signature", required = false) String signature
-    ) {
+            @RequestBody byte[] rawBody,
+            @RequestHeader(value = "X-Razorpay-Signature", required = false) String signature) {
         if (!signatureVerifier.verify(rawBody, signature)) {
             log.warn("[webhook] Rejected delivery: invalid or missing X-Razorpay-Signature");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
@@ -101,9 +99,9 @@ public class RazorpayWebhookController {
         }
 
         if (event.event() == null
-            || event.payload() == null
-            || event.payload().payment() == null
-            || event.payload().payment().entity() == null) {
+                || event.payload() == null
+                || event.payload().payment() == null
+                || event.payload().payment().entity() == null) {
             log.warn("[webhook] Rejected delivery: missing required event/payload/payment fields");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }

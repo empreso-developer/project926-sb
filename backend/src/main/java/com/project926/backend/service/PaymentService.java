@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Mirrors app/(project926)/project926/api/payments/create-order/route.ts
+ * Mirrors app/(project926)/p/api/payments/create-order/route.ts
  * and .../payments/verify/route.ts exactly. See the Phase D report for the
  * full behavioral audit this was built from.
  *
@@ -68,15 +68,14 @@ public class PaymentService {
     private final TicketEmailService ticketEmailService;
 
     public PaymentService(
-        EventRepository eventRepository,
-        TicketTypeRepository ticketTypeRepository,
-        BookingRepository bookingRepository,
-        PaymentRepository paymentRepository,
-        BookingInventoryRepository bookingInventoryRepository,
-        RazorpayGateway razorpayGateway,
-        QrCodeGenerator qrCodeGenerator,
-        TicketEmailService ticketEmailService
-    ) {
+            EventRepository eventRepository,
+            TicketTypeRepository ticketTypeRepository,
+            BookingRepository bookingRepository,
+            PaymentRepository paymentRepository,
+            BookingInventoryRepository bookingInventoryRepository,
+            RazorpayGateway razorpayGateway,
+            QrCodeGenerator qrCodeGenerator,
+            TicketEmailService ticketEmailService) {
         this.eventRepository = eventRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.bookingRepository = bookingRepository;
@@ -91,7 +90,7 @@ public class PaymentService {
 
     public CreateOrderResponse createOrder(String customerId, CreateOrderRequest request) {
         Event event = eventRepository.findById(request.eventId())
-            .orElseThrow(() -> new PaymentFlowNotFoundException("Event not found"));
+                .orElseThrow(() -> new PaymentFlowNotFoundException("Event not found"));
         if (!APPROVED.equals(event.getStatus())) {
             throw new BookingValidationException("Event is not available for booking");
         }
@@ -105,9 +104,10 @@ public class PaymentService {
         BigDecimal totalAmount = BigDecimal.ZERO;
         for (CreateOrderRequest.Item item : request.items()) {
             TicketType tt = ticketTypes.stream()
-                .filter(t -> t.getId().equals(item.ticketTypeId()))
-                .findFirst()
-                .orElseThrow(() -> new BookingValidationException("Ticket type " + item.ticketTypeId() + " not found"));
+                    .filter(t -> t.getId().equals(item.ticketTypeId()))
+                    .findFirst()
+                    .orElseThrow(
+                            () -> new BookingValidationException("Ticket type " + item.ticketTypeId() + " not found"));
 
             int remaining = tt.getQuantityTotal() - tt.getQuantitySold();
             if (item.quantity() > remaining) {
@@ -123,13 +123,13 @@ public class PaymentService {
         // Same JSON shape as the existing itemsPayload:
         // [{ ticket_type_id, quantity }, ...]
         JSONObject[] itemsArray = request.items().stream()
-            .map(i -> {
-                JSONObject o = new JSONObject();
-                o.put("ticket_type_id", i.ticketTypeId().toString());
-                o.put("quantity", i.quantity());
-                return o;
-            })
-            .toArray(JSONObject[]::new);
+                .map(i -> {
+                    JSONObject o = new JSONObject();
+                    o.put("ticket_type_id", i.ticketTypeId().toString());
+                    o.put("quantity", i.quantity());
+                    return o;
+                })
+                .toArray(JSONObject[]::new);
         String itemsJson = new org.json.JSONArray(itemsArray).toString();
 
         // Auto-commits independently, exactly like the existing
@@ -140,8 +140,8 @@ public class PaymentService {
         }
 
         long amountPaise = totalAmount.multiply(BigDecimal.valueOf(100))
-            .setScale(0, RoundingMode.HALF_UP)
-            .longValueExact();
+                .setScale(0, RoundingMode.HALF_UP)
+                .longValueExact();
 
         Map<String, String> notes = new LinkedHashMap<>();
         notes.put("booking_id", bookingId.toString());
@@ -150,7 +150,8 @@ public class PaymentService {
 
         Order order;
         try {
-            String receipt = "booking_" + bookingId.toString().substring(0, Math.min(24, bookingId.toString().length()));
+            String receipt = "booking_"
+                    + bookingId.toString().substring(0, Math.min(24, bookingId.toString().length()));
             order = razorpayGateway.createOrder(amountPaise, INR, receipt, notes);
         } catch (RazorpayException e) {
             // Matches the existing route's behavior exactly: this isn't
@@ -178,7 +179,7 @@ public class PaymentService {
 
     public VerifyPaymentResponse verifyPayment(String customerId, VerifyPaymentRequest request) {
         Booking booking = bookingRepository.findById(request.bookingId())
-            .orElseThrow(() -> new PaymentFlowNotFoundException("Booking not found"));
+                .orElseThrow(() -> new PaymentFlowNotFoundException("Booking not found"));
         if (!booking.getCustomerId().equals(customerId)) {
             throw new ForbiddenException("Forbidden");
         }
@@ -202,10 +203,11 @@ public class PaymentService {
         }
 
         Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(booking.getId())
-            .orElseThrow(() -> new BookingValidationException("No payment record found for this booking"));
+                .orElseThrow(() -> new BookingValidationException("No payment record found for this booking"));
 
         // 1. Signature verification.
-        if (!razorpayGateway.verifySignature(request.razorpayOrderId(), request.razorpayPaymentId(), request.razorpaySignature())) {
+        if (!razorpayGateway.verifySignature(request.razorpayOrderId(), request.razorpayPaymentId(),
+                request.razorpaySignature())) {
             rejectPayment(payment.getId(), booking.getId(), "invalid signature", booking.getReference());
             throw new BookingValidationException("Signature verification failed");
         }
@@ -229,19 +231,21 @@ public class PaymentService {
         }
 
         long expectedPaise = payment.getAmount()
-            .multiply(BigDecimal.valueOf(100))
-            .setScale(0, RoundingMode.HALF_UP)
-            .longValueExact();
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(0, RoundingMode.HALF_UP)
+                .longValueExact();
 
         String rpOrderId = rpPayment.get("order_id");
         if (!request.razorpayOrderId().equals(rpOrderId)) {
-            rejectPayment(payment.getId(), booking.getId(), "razorpay payment does not belong to the expected order", booking.getReference());
+            rejectPayment(payment.getId(), booking.getId(), "razorpay payment does not belong to the expected order",
+                    booking.getReference());
             throw new BookingValidationException("Payment/order mismatch");
         }
 
         String rpStatus = rpPayment.get("status");
         if (!"captured".equals(rpStatus)) {
-            rejectPayment(payment.getId(), booking.getId(), "razorpay payment status is " + rpStatus + ", not captured", booking.getReference());
+            rejectPayment(payment.getId(), booking.getId(), "razorpay payment status is " + rpStatus + ", not captured",
+                    booking.getReference());
             throw new BookingValidationException("Payment was not captured");
         }
 
@@ -249,8 +253,9 @@ public class PaymentService {
         String rpCurrency = rpPayment.get("currency");
         if (rpAmount != expectedPaise || !rpCurrency.equals(payment.getCurrency())) {
             rejectPayment(payment.getId(), booking.getId(),
-                "amount mismatch: expected " + expectedPaise + " " + payment.getCurrency() + ", got " + rpAmount + " " + rpCurrency,
-                booking.getReference());
+                    "amount mismatch: expected " + expectedPaise + " " + payment.getCurrency() + ", got " + rpAmount
+                            + " " + rpCurrency,
+                    booking.getReference());
             throw new BookingValidationException("Payment amount mismatch");
         }
 
@@ -263,7 +268,8 @@ public class PaymentService {
         bookingRepository.updateStatus(bookingId, "cancelled");
     }
 
-    // ================= shared confirmation (verify + Phase G webhook) =================
+    // ================= shared confirmation (verify + Phase G webhook)
+    // =================
 
     /**
      * The confirmation sequence shared by the browser {@code /verify}
@@ -279,7 +285,8 @@ public class PaymentService {
      * webhook must not become a second, subtly different payment
      * implementation.
      *
-     * <p>Callers MUST have already, via their own distinct trust
+     * <p>
+     * Callers MUST have already, via their own distinct trust
      * mechanism, established that {@code razorpayPaymentId} represents a
      * genuinely captured payment for this exact {@code payment} row
      * (verify: client-signature check + a live Razorpay API fetch;
@@ -296,7 +303,8 @@ public class PaymentService {
      *                          value — the {@code razorpay_signature}
      *                          column is nullable for exactly this case).
      */
-    VerifyPaymentResponse confirmCapturedPayment(Booking booking, Payment payment, String razorpayPaymentId, String razorpaySignature) {
+    VerifyPaymentResponse confirmCapturedPayment(Booking booking, Payment payment, String razorpayPaymentId,
+            String razorpaySignature) {
         // Generate the QR code (pure function of booking reference/id/event_id
         // — deterministic, so it's identical however many times this runs,
         // exactly matching the existing route's comment). Generated BEFORE
@@ -312,9 +320,8 @@ public class PaymentService {
             newlyConfirmed = bookingInventoryRepository.confirmBookingAndCommitInventory(booking.getId(), qrCode);
         } catch (SoldOutException soldOut) {
             log.error(
-                "[payment-confirm] CRITICAL: booking {} paid (razorpay payment {}) but sold out at confirmation — manual refund required: {}",
-                booking.getReference(), razorpayPaymentId, soldOut.getMessage()
-            );
+                    "[payment-confirm] CRITICAL: booking {} paid (razorpay payment {}) but sold out at confirmation — manual refund required: {}",
+                    booking.getReference(), razorpayPaymentId, soldOut.getMessage());
             paymentRepository.markPaid(payment.getId(), razorpayPaymentId, razorpaySignature, "paid");
             bookingRepository.updateStatus(booking.getId(), "cancelled");
             throw soldOut;

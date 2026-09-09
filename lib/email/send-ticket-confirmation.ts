@@ -175,7 +175,7 @@ export async function sendBookingConfirmationEmailOnce(
         paymentId: payment?.razorpay_payment_id ?? null,
       },
       qrCodeDataUrl: booking.qr_code,
-      dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/project926/dashboard/customer`,
+      dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/p/dashboard/customer`,
     };
 
     await sendTicketConfirmationEmail(emailData);

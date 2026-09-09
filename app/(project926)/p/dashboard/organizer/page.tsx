@@ -57,7 +57,7 @@ export default async function OrganizerDashboard() {
           </p>
         </div>
         <Button asChild className="shadow-soft">
-          <Link href="/project926/dashboard/organizer/events/new">
+          <Link href="/p/dashboard/organizer/events/new">
             <Plus className="mr-1.5 h-4 w-4" />
             Create event
           </Link>
@@ -100,7 +100,7 @@ export default async function OrganizerDashboard() {
               Create your first event to start selling tickets.
             </p>
             <Button asChild className="mt-5 shadow-soft">
-              <Link href="/project926/dashboard/organizer/events/new">
+              <Link href="/p/dashboard/organizer/events/new">
                 <Plus className="mr-1.5 h-4 w-4" />
                 Create event
               </Link>
@@ -154,10 +154,10 @@ export default async function OrganizerDashboard() {
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <Button asChild variant="outline" size="sm">
-                      <Link href={`/project926/events/${e.id}`}>View</Link>
+                      <Link href={`/p/events/${e.id}`}>View</Link>
                     </Button>
                     <Button asChild size="sm">
-                      <Link href={`/project926/dashboard/organizer/events/${e.id}`}>Manage</Link>
+                      <Link href={`/p/dashboard/organizer/events/${e.id}`}>Manage</Link>
                     </Button>
                   </div>
                 </div>

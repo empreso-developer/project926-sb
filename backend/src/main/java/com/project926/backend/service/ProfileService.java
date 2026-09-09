@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import java.util.Set;
 
 /**
- * Mirrors app/(project926)/project926/api/profile/route.ts exactly:
+ * Mirrors app/(project926)/p/api/profile/route.ts exactly:
  * read-only lookup by the authenticated Clerk user id, defaulting to
  * "customer" when no profile row exists yet — no write, no sync-from-Clerk
  * side effect (that self-healing behavior belongs to
@@ -30,15 +30,15 @@ public class ProfileService {
      */
     public ProfileResponse getRoleForAuthenticatedUser(String clerkUserId) {
         String role = profileRepository.findById(clerkUserId)
-            .map(profile -> profile.getRole())
-            .orElse("customer");
+                .map(profile -> profile.getRole())
+                .orElse("customer");
         return new ProfileResponse(role);
     }
 
     /**
      * Phase C's translation of middleware.ts's isOrganizerRoute gate
      * (`resolvedRole === 'organizer' || resolvedRole === 'admin'`, applied
-     * to the whole /project926/dashboard/organizer(.*) subtree) into a
+     * to the whole /p/dashboard/organizer(.*) subtree) into a
      * service-level check.
      *
      * This exists because the underlying Next.js server actions

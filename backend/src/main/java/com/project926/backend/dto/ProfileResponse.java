@@ -1,7 +1,7 @@
 package com.project926.backend.dto;
 
 /**
- * Matches the existing {@code GET /project926/api/profile} response shape
+ * Matches the existing {@code GET /p/api/profile} response shape
  * exactly: {@code {"role": "customer" | "organizer" | "admin"}}. The
  * existing frontend (components/site-header.tsx) only ever reads
  * {@code data.role} from this endpoint, so no other profile field is

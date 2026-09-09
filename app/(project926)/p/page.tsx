@@ -79,7 +79,7 @@ export default async function Home() {
               secure payments and instant QR check-in.
             </p>
             <form
-              action="/project926/events"
+              action="/p/events"
               className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-full border border-white/60 bg-white/95 p-1.5 shadow-xl backdrop-blur-md"
             >
               <Search className="ml-3 h-5 w-5 shrink-0 text-muted-foreground" />
@@ -138,7 +138,7 @@ export default async function Home() {
               Are you an organizer? Start by creating your first event.
             </p>
             <Button asChild className="mt-6 shadow-soft">
-              <a href="/project926/dashboard/organizer/events/new">Become an organizer</a>
+              <a href="/p/dashboard/organizer/events/new">Become an organizer</a>
             </Button>
           </div>
         ) : (

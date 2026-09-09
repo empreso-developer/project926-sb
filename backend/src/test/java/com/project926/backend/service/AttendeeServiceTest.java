@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Mocked-repository coverage of AttendeeService — mirrors
- * app/(project926)/project926/dashboard/organizer/events/[id]/attendees/page.tsx
+ * app/(project926)/p/dashboard/organizer/events/[id]/attendees/page.tsx
  * (Step 18's attendee-listing test matrix): authorization delegation,
  * default pagination/filter, and search-pattern construction (including
  * ESCAPE-safe LIKE-wildcard escaping — see BookingRepository.findAttendees).
@@ -58,7 +58,8 @@ class AttendeeServiceTest {
     private ProfileRepository profileRepository;
 
     private AttendeeService service() {
-        return new AttendeeService(eventService, bookingRepository, bookingItemRepository, ticketTypeRepository, profileRepository);
+        return new AttendeeService(eventService, bookingRepository, bookingItemRepository, ticketTypeRepository,
+                profileRepository);
     }
 
     private static final UUID EVENT_ID = UUID.randomUUID();
@@ -67,19 +68,21 @@ class AttendeeServiceTest {
     @Test
     void listAttendees_delegatesAuthorizationToEventService_andPropagatesForbidden() {
         AttendeeService service = service();
-        doThrow(new ForbiddenException("Forbidden")).when(eventService).requireEventOrganizerOrAdmin(EVENT_ID, CALLER_ID);
+        doThrow(new ForbiddenException("Forbidden")).when(eventService).requireEventOrganizerOrAdmin(EVENT_ID,
+                CALLER_ID);
 
         assertThatThrownBy(() -> service.listAttendees(EVENT_ID, CALLER_ID, null, null, null))
-            .isInstanceOf(ForbiddenException.class);
+                .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
     void listAttendees_propagatesNotFound_whenEventDoesNotExist() {
         AttendeeService service = service();
-        doThrow(new EventNotFoundException(EVENT_ID)).when(eventService).requireEventOrganizerOrAdmin(EVENT_ID, CALLER_ID);
+        doThrow(new EventNotFoundException(EVENT_ID)).when(eventService).requireEventOrganizerOrAdmin(EVENT_ID,
+                CALLER_ID);
 
         assertThatThrownBy(() -> service.listAttendees(EVENT_ID, CALLER_ID, null, null, null))
-            .isInstanceOf(EventNotFoundException.class);
+                .isInstanceOf(EventNotFoundException.class);
     }
 
     @Test
@@ -144,13 +147,14 @@ class AttendeeServiceTest {
         Booking checkedIn = booking(booking1, EVENT_ID, "confirmed", OffsetDateTime.now());
         Booking notCheckedIn = booking(booking2, EVENT_ID, "confirmed", null);
         when(eventService.requireEventOrganizerOrAdmin(EVENT_ID, CALLER_ID)).thenReturn(null);
-        when(bookingRepository.findByEventIdAndStatus(EVENT_ID, "confirmed")).thenReturn(List.of(checkedIn, notCheckedIn));
+        when(bookingRepository.findByEventIdAndStatus(EVENT_ID, "confirmed"))
+                .thenReturn(List.of(checkedIn, notCheckedIn));
 
         BookingItem item1 = bookingItem(booking1, UUID.randomUUID(), 3);
         BookingItem item2 = bookingItem(booking2, UUID.randomUUID(), 2);
         when(bookingItemRepository.findByBookingIdIn(List.of(booking1, booking2))).thenReturn(List.of(item1, item2));
         when(bookingRepository.findAttendees(eq(EVENT_ID), anyString(), anyString(), any(Pageable.class)))
-            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 25), 0));
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 25), 0));
 
         AttendeeListResponse response = service.listAttendees(EVENT_ID, CALLER_ID, null, null, null);
 
@@ -171,7 +175,7 @@ class AttendeeServiceTest {
         when(eventService.requireEventOrganizerOrAdmin(EVENT_ID, CALLER_ID)).thenReturn(null);
         when(bookingRepository.findByEventIdAndStatus(EVENT_ID, "confirmed")).thenReturn(List.of());
         when(bookingRepository.findAttendees(eq(EVENT_ID), anyString(), anyString(), any(Pageable.class)))
-            .thenReturn(new PageImpl<>(List.of(booking), PageRequest.of(0, 25), 1));
+                .thenReturn(new PageImpl<>(List.of(booking), PageRequest.of(0, 25), 1));
 
         Profile profile = newInstance(Profile.class);
         set(profile, "id", booking.getCustomerId());

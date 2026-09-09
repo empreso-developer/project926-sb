@@ -56,15 +56,14 @@ public class TicketEmailService {
     private final String dashboardUrl;
 
     public TicketEmailService(
-        BookingRepository bookingRepository,
-        EventRepository eventRepository,
-        BookingItemRepository bookingItemRepository,
-        TicketTypeRepository ticketTypeRepository,
-        PaymentRepository paymentRepository,
-        ProfileRepository profileRepository,
-        ResendGateway resendGateway,
-        @Value("${app.public-url:http://localhost:3000}") String appPublicUrl
-    ) {
+            BookingRepository bookingRepository,
+            EventRepository eventRepository,
+            BookingItemRepository bookingItemRepository,
+            TicketTypeRepository ticketTypeRepository,
+            PaymentRepository paymentRepository,
+            ProfileRepository profileRepository,
+            ResendGateway resendGateway,
+            @Value("${app.public-url:http://localhost:3000}") String appPublicUrl) {
         this.bookingRepository = bookingRepository;
         this.eventRepository = eventRepository;
         this.bookingItemRepository = bookingItemRepository;
@@ -72,7 +71,7 @@ public class TicketEmailService {
         this.paymentRepository = paymentRepository;
         this.profileRepository = profileRepository;
         this.resendGateway = resendGateway;
-        this.dashboardUrl = appPublicUrl + "/project926/dashboard/customer";
+        this.dashboardUrl = appPublicUrl + "/p/dashboard/customer";
     }
 
     /**
@@ -107,45 +106,45 @@ public class TicketEmailService {
             List<BookingItem> items = bookingItemRepository.findByBookingId(booking.getId());
             List<UUID> ticketTypeIds = items.stream().map(BookingItem::getTicketTypeId).distinct().toList();
             Map<UUID, TicketType> ticketTypesById = ticketTypeRepository.findAllById(ticketTypeIds).stream()
-                .collect(Collectors.toMap(TicketType::getId, t -> t));
+                    .collect(Collectors.toMap(TicketType::getId, t -> t));
 
             Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(booking.getId()).orElse(null);
 
             TicketConfirmationEmailData emailData = new TicketConfirmationEmailData(
-                new TicketConfirmationEmailData.Customer(profile.getFirstName(), profile.getLastName(), profile.getEmail()),
-                new TicketConfirmationEmailData.BookingInfo(booking.getId().toString(), booking.getReference(), booking.getTotalAmount()),
-                new TicketConfirmationEmailData.EventInfo(
-                    event.getTitle(),
-                    EmailFormatUtils.formatDate(event.getEventDate()),
-                    EmailFormatUtils.formatTime(event.getEventTime()),
-                    event.getVenue(),
-                    event.getCity(),
-                    event.getBannerUrl()
-                ),
-                items.stream().map(item -> {
-                    TicketType tt = ticketTypesById.get(item.getTicketTypeId());
-                    return new TicketConfirmationEmailData.TicketLine(
-                        tt != null ? tt.getName() : "Ticket",
-                        item.getQuantity(),
-                        item.getUnitPrice(),
-                        item.getSubtotal()
-                    );
-                }).toList(),
-                new TicketConfirmationEmailData.PaymentInfo(
-                    payment != null ? payment.getAmount() : booking.getTotalAmount(),
-                    payment != null ? payment.getCurrency() : "INR",
-                    payment != null ? payment.getRazorpayPaymentId() : null
-                ),
-                qrCodeDataUrl,
-                dashboardUrl
-            );
+                    new TicketConfirmationEmailData.Customer(profile.getFirstName(), profile.getLastName(),
+                            profile.getEmail()),
+                    new TicketConfirmationEmailData.BookingInfo(booking.getId().toString(), booking.getReference(),
+                            booking.getTotalAmount()),
+                    new TicketConfirmationEmailData.EventInfo(
+                            event.getTitle(),
+                            EmailFormatUtils.formatDate(event.getEventDate()),
+                            EmailFormatUtils.formatTime(event.getEventTime()),
+                            event.getVenue(),
+                            event.getCity(),
+                            event.getBannerUrl()),
+                    items.stream().map(item -> {
+                        TicketType tt = ticketTypesById.get(item.getTicketTypeId());
+                        return new TicketConfirmationEmailData.TicketLine(
+                                tt != null ? tt.getName() : "Ticket",
+                                item.getQuantity(),
+                                item.getUnitPrice(),
+                                item.getSubtotal());
+                    }).toList(),
+                    new TicketConfirmationEmailData.PaymentInfo(
+                            payment != null ? payment.getAmount() : booking.getTotalAmount(),
+                            payment != null ? payment.getCurrency() : "INR",
+                            payment != null ? payment.getRazorpayPaymentId() : null),
+                    qrCodeDataUrl,
+                    dashboardUrl);
 
             sendTicketConfirmationEmail(emailData);
             log.info("[email/ticket] Confirmation email sent for booking {}", booking.getReference());
         } catch (Exception e) {
             String message = e.getMessage() != null ? e.getMessage() : "Unknown error";
-            log.error("[email/ticket] Failed to send confirmation email for booking {}: {}", booking.getReference(), message, e);
-            bookingRepository.recordTicketEmailError(booking.getId(), message.length() > 500 ? message.substring(0, 500) : message);
+            log.error("[email/ticket] Failed to send confirmation email for booking {}: {}", booking.getReference(),
+                    message, e);
+            bookingRepository.recordTicketEmailError(booking.getId(),
+                    message.length() > 500 ? message.substring(0, 500) : message);
         }
     }
 
@@ -160,19 +159,18 @@ public class TicketEmailService {
         String qrDataUrl = data.qrCodeDataUrl();
         int commaIndex = qrDataUrl != null ? qrDataUrl.indexOf(',') : -1;
         byte[] qrBytes = commaIndex >= 0
-            ? Base64.getDecoder().decode(qrDataUrl.substring(commaIndex + 1))
-            : new byte[0];
+                ? Base64.getDecoder().decode(qrDataUrl.substring(commaIndex + 1))
+                : new byte[0];
 
         var rendered = TicketConfirmationEmailTemplate.render(data, QR_CONTENT_ID);
 
         resendGateway.sendEmail(
-            data.customer().email(),
-            rendered.subject(),
-            rendered.html(),
-            qrBytes,
-            "ticket-qr-code.png",
-            "image/png",
-            QR_CONTENT_ID
-        );
+                data.customer().email(),
+                rendered.subject(),
+                rendered.html(),
+                qrBytes,
+                "ticket-qr-code.png",
+                "image/png",
+                QR_CONTENT_ID);
     }
 }

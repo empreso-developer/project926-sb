@@ -66,6 +66,16 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     Optional<Booking> findByReference(String reference);
 
     /**
+     * Mirrors the customer dashboard's own-bookings query exactly:
+     * {@code .eq('customer_id', userId).order('created_at', {ascending:false})}
+     * — no status filter (pending/confirmed/cancelled all included; the
+     * page itself splits them client-side into "confirmed"/"pending"
+     * stats) — see app/(project926)/p/dashboard/customer/page.tsx and
+     * CustomerBookingService.
+     */
+    List<Booking> findByCustomerIdOrderByCreatedAtDesc(String customerId);
+
+    /**
      * Mirrors the attendees page's stats query source rows: all confirmed
      * bookings for the event (used to compute totalSold/checkedInQty from
      * their booking_items — see AttendeeService).

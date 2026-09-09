@@ -2,33 +2,73 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Calendar, Clock, MapPin, QrCode, Ticket, ArrowRight } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { backendFetch } from '@/lib/backend/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
-import type { Booking, BookingItem, EventRow, Payment, TicketType } from '@/lib/types';
+import type { BookingStatus } from '@/lib/types';
 
-interface CustomerBooking extends Booking {
-  event: EventRow | null;
-  booking_items: (BookingItem & { ticket_type: TicketType | null })[];
-  payments: Payment[];
+interface CustomerBookingEvent {
+  id: string;
+  title: string;
+  event_date: string;
+  event_time: string;
+  venue: string;
+  city: string;
+  banner_url: string | null;
+}
+
+interface CustomerBookingPayment {
+  razorpay_payment_id: string | null;
+}
+
+interface CustomerBooking {
+  id: string;
+  reference: string;
+  status: BookingStatus;
+  total_amount: number;
+  qr_code: string | null;
+  checked_in_at: string | null;
+  created_at: string;
+  ticket_quantity: number;
+  event: CustomerBookingEvent | null;
+  payment: CustomerBookingPayment | null;
+}
+
+/**
+ * Migrated off Supabase (Category A gap closed): now calls Spring's
+ * GET /api/v1/customer/bookings (CustomerBookingService), which reproduces
+ * the exact original query — no status filter, ordered by created_at
+ * descending — see CustomerBookingService's Javadoc for the full field-by-
+ * field audit this was built from. The Clerk id used server-side by Spring
+ * comes only from the validated JWT subject; the browser never sees it and
+ * never calls Spring directly (backendFetch runs here, in the Server
+ * Component, exactly like every other Phase H-migrated page).
+ *
+ * Fail-soft on a backend error mirrors every other Phase H-migrated page
+ * (homepage, event detail, organizer/admin dashboards): log server-side,
+ * render the existing empty state, never crash or expose a stack trace.
+ * This is NOT a new pattern invented for this page — it's the established
+ * convention, and it also happens to match the ORIGINAL Supabase query's
+ * own behavior (which destructured only `{ data }`, never checked
+ * `error`, and so already silently fell back to `[]` on a query failure).
+ */
+async function getOwnBookings(): Promise<CustomerBooking[]> {
+  try {
+    return await backendFetch<CustomerBooking[]>('/api/v1/customer/bookings');
+  } catch (error) {
+    console.error('Failed to load bookings:', error);
+    return [];
+  }
 }
 
 export default async function CustomerDashboard() {
   const { userId } = await auth();
   if (!userId) return null;
 
-  const { data: bookings } = await supabaseAdmin
-    .from('bookings')
-    .select(
-      '*, event:events(*), booking_items(*, ticket_type:ticket_types(*)), payments(*)',
-    )
-    .eq('customer_id', userId)
-    .order('created_at', { ascending: false });
-
-  const typedBookings = (bookings ?? []) as unknown as CustomerBooking[];
+  const typedBookings = await getOwnBookings();
 
   const confirmed = typedBookings.filter((b) => b.status === 'confirmed');
   const pending = typedBookings.filter((b) => b.status === 'pending');
@@ -47,7 +87,7 @@ export default async function CustomerDashboard() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/project926">
+          <Link href="/p">
             Browse more events
             <ArrowRight className="ml-1.5 h-4 w-4" />
           </Link>
@@ -109,8 +149,8 @@ export default async function CustomerDashboard() {
 
 function BookingRow({ booking }: { booking: CustomerBooking }) {
   const event = booking.event;
-  const totalQty = booking.booking_items.reduce((s, i) => s + i.quantity, 0);
-  const payment = booking.payments?.[0];
+  const totalQty = booking.ticket_quantity;
+  const payment = booking.payment;
   const statusColor =
     booking.status === 'confirmed'
       ? 'success'

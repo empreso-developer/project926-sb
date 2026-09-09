@@ -58,7 +58,7 @@ export function EventForm({ eventId, defaults }: EventFormProps) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('/project926/api/upload-banner', { method: 'POST', body: formData });
+      const res = await fetch('/p/api/upload-banner', { method: 'POST', body: formData });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Upload failed');
       setBannerUrl(json.url);
@@ -85,12 +85,12 @@ export function EventForm({ eventId, defaults }: EventFormProps) {
       if (eventId) {
         await updateEventAction(eventId, payload);
         toast({ title: 'Event updated' });
-        router.push('/project926/dashboard/organizer');
+        router.push('/p/dashboard/organizer');
       } else {
         const created = await createEventAction(payload);
         toast({ title: 'Event created', description: 'Add ticket types to start selling.' });
         console.log(created);
-        router.push(`/project926/dashboard/organizer/events/${created.id}`);
+        router.push(`/p/dashboard/organizer/events/${created.id}`);
       }
       router.refresh();
     } catch (err) {

@@ -42,7 +42,7 @@ export default async function ManageEventPage({ params }: EventPageProps) {
   return (
     <div className="container mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
       <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
-        <Link href="/project926/dashboard/organizer">
+        <Link href="/p/dashboard/organizer">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           Back to dashboard
         </Link>
@@ -64,19 +64,19 @@ export default async function ManageEventPage({ params }: EventPageProps) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
-            <Link href={`/project926/dashboard/organizer/events/${typedEvent.id}/attendees`}>
+            <Link href={`/p/dashboard/organizer/events/${typedEvent.id}/attendees`}>
               <Users className="mr-1.5 h-4 w-4" />
               Attendees
             </Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href={`/project926/dashboard/organizer/events/${typedEvent.id}/scan`}>
+            <Link href={`/p/dashboard/organizer/events/${typedEvent.id}/scan`}>
               <QrCode className="mr-1.5 h-4 w-4" />
               Scan tickets
             </Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href={`/project926/events/${typedEvent.id}`} target="_blank">
+            <Link href={`/p/events/${typedEvent.id}`} target="_blank">
               View public page
             </Link>
           </Button>

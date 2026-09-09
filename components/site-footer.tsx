@@ -15,24 +15,24 @@ export function SiteFooter() {
           <div>
             <h4 className="text-sm font-semibold">Discover</h4>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/project926" className="hover:text-foreground">All events</Link></li>
-              <li><Link href="/project926/?tab=concerts" className="hover:text-foreground">Concerts</Link></li>
-              <li><Link href="/project926/?tab=comedy" className="hover:text-foreground">Comedy</Link></li>
+              <li><Link href="/p" className="hover:text-foreground">All events</Link></li>
+              <li><Link href="/p/?tab=concerts" className="hover:text-foreground">Concerts</Link></li>
+              <li><Link href="/p/?tab=comedy" className="hover:text-foreground">Comedy</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="text-sm font-semibold">For Organizers</h4>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/project926/dashboard/organizer" className="hover:text-foreground">Dashboard</Link></li>
-              <li><Link href="/project926/dashboard/organizer/events/new" className="hover:text-foreground">Create event</Link></li>
+              <li><Link href="/p/dashboard/organizer" className="hover:text-foreground">Dashboard</Link></li>
+              <li><Link href="/p/dashboard/organizer/events/new" className="hover:text-foreground">Create event</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="text-sm font-semibold">Account</h4>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/project926/sign-in" className="hover:text-foreground">Sign in</Link></li>
-              <li><Link href="/project926/sign-up" className="hover:text-foreground">Sign up</Link></li>
-              <li><Link href="/project926/dashboard/customer" className="hover:text-foreground">My tickets</Link></li>
+              <li><Link href="/p/sign-in" className="hover:text-foreground">Sign in</Link></li>
+              <li><Link href="/p/sign-up" className="hover:text-foreground">Sign up</Link></li>
+              <li><Link href="/p/dashboard/customer" className="hover:text-foreground">My tickets</Link></li>
             </ul>
           </div>
         </div>

@@ -18,8 +18,8 @@ import java.util.UUID;
 
 /**
  * Mirrors two existing Next.js server-side reads:
- * - app/(project926)/project926/page.tsx#getApprovedEvents (listing)
- * - app/(project926)/project926/events/[id]/page.tsx#getEvent (detail)
+ * - app/(project926)/p/page.tsx#getApprovedEvents (listing)
+ * - app/(project926)/p/events/[id]/page.tsx#getEvent (detail)
  *
  * Both existing queries are .select('*, ticket_types(*)') with no organizer
  * join, so both are reproduced here as two plain repository calls per
@@ -37,10 +37,9 @@ public class EventService {
     private final ProfileService profileService;
 
     public EventService(
-        EventRepository eventRepository,
-        TicketTypeRepository ticketTypeRepository,
-        ProfileService profileService
-    ) {
+            EventRepository eventRepository,
+            TicketTypeRepository ticketTypeRepository,
+            ProfileService profileService) {
         this.eventRepository = eventRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.profileService = profileService;
@@ -54,8 +53,8 @@ public class EventService {
     @Transactional(readOnly = true)
     public List<EventDto> listApprovedEvents() {
         return eventRepository.findByStatusOrderByEventDateAsc(APPROVED).stream()
-            .map(this::toDto)
-            .toList();
+                .map(this::toDto)
+                .toList();
     }
 
     /**
@@ -67,7 +66,7 @@ public class EventService {
     @Transactional(readOnly = true)
     public EventDto getEventById(UUID eventId) {
         Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> new EventNotFoundException(eventId));
+                .orElseThrow(() -> new EventNotFoundException(eventId));
         return toDto(event);
     }
 
@@ -88,15 +87,14 @@ public class EventService {
     public EventDto createEvent(String organizerId, CreateEventRequest request) {
         profileService.requireOrganizerOrAdminRole(organizerId);
         Event event = Event.createDraft(
-            organizerId,
-            request.title(),
-            request.description(),
-            request.eventDate(),
-            request.eventTime(),
-            request.venue(),
-            request.city(),
-            request.bannerUrl()
-        );
+                organizerId,
+                request.title(),
+                request.description(),
+                request.eventDate(),
+                request.eventTime(),
+                request.venue(),
+                request.city(),
+                request.bannerUrl());
         eventRepository.save(event);
         return toDto(event);
     }
@@ -111,14 +109,13 @@ public class EventService {
         profileService.requireOrganizerOrAdminRole(callerId);
         Event event = requireOwnedEvent(eventId, callerId);
         event.applyOrganizerUpdate(
-            request.title(),
-            request.description(),
-            request.eventDate(),
-            request.eventTime(),
-            request.venue(),
-            request.city(),
-            request.bannerUrl()
-        );
+                request.title(),
+                request.description(),
+                request.eventDate(),
+                request.eventTime(),
+                request.venue(),
+                request.city(),
+                request.bannerUrl());
         return toDto(event);
     }
 
@@ -151,15 +148,15 @@ public class EventService {
     }
 
     /**
-     * Mirrors app/(project926)/project926/dashboard/organizer/page.tsx's
+     * Mirrors app/(project926)/p/dashboard/organizer/page.tsx's
      * own-events query: organizer_id = caller, ordered by created_at desc.
      */
     @Transactional(readOnly = true)
     public List<EventDto> listOwnEvents(String organizerId) {
         profileService.requireOrganizerOrAdminRole(organizerId);
         return eventRepository.findByOrganizerIdOrderByCreatedAtDesc(organizerId).stream()
-            .map(this::toDto)
-            .toList();
+                .map(this::toDto)
+                .toList();
     }
 
     /**
@@ -176,8 +173,8 @@ public class EventService {
     public EventDto getOwnEventById(UUID eventId, String callerId) {
         profileService.requireOrganizerOrAdminRole(callerId);
         Event event = eventRepository.findById(eventId)
-            .filter(e -> e.getOrganizerId().equals(callerId))
-            .orElseThrow(() -> new EventNotFoundException(eventId));
+                .filter(e -> e.getOrganizerId().equals(callerId))
+                .orElseThrow(() -> new EventNotFoundException(eventId));
         return toDto(event);
     }
 
@@ -203,7 +200,7 @@ public class EventService {
     @Transactional(readOnly = true)
     public Event requireEventOrganizerOrAdmin(UUID eventId, String callerId) {
         Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> new EventNotFoundException(eventId));
+                .orElseThrow(() -> new EventNotFoundException(eventId));
         if (event.getOrganizerId().equals(callerId) || profileService.isAdmin(callerId)) {
             return event;
         }
@@ -212,7 +209,7 @@ public class EventService {
 
     private Event requireOwnedEvent(UUID eventId, String callerId) {
         Event event = eventRepository.findById(eventId)
-            .orElseThrow(() -> new EventNotFoundException(eventId));
+                .orElseThrow(() -> new EventNotFoundException(eventId));
         if (!event.getOrganizerId().equals(callerId)) {
             throw new ForbiddenException("Not the organizer of this event");
         }
@@ -221,38 +218,36 @@ public class EventService {
 
     private EventDto toDto(Event event) {
         List<TicketTypeDto> ticketTypes = ticketTypeRepository.findByEventId(event.getId()).stream()
-            .map(this::toDto)
-            .toList();
+                .map(this::toDto)
+                .toList();
 
         return new EventDto(
-            event.getId(),
-            event.getOrganizerId(),
-            event.getTitle(),
-            event.getDescription(),
-            event.getEventDate(),
-            event.getEventTime(),
-            event.getVenue(),
-            event.getCity(),
-            event.getBannerUrl(),
-            event.getStatus(),
-            event.getCreatedAt(),
-            event.getUpdatedAt(),
-            ticketTypes
-        );
+                event.getId(),
+                event.getOrganizerId(),
+                event.getTitle(),
+                event.getDescription(),
+                event.getEventDate(),
+                event.getEventTime(),
+                event.getVenue(),
+                event.getCity(),
+                event.getBannerUrl(),
+                event.getStatus(),
+                event.getCreatedAt(),
+                event.getUpdatedAt(),
+                ticketTypes);
     }
 
     private TicketTypeDto toDto(TicketType t) {
         return new TicketTypeDto(
-            t.getId(),
-            t.getEventId(),
-            t.getName(),
-            t.getPrice(),
-            t.getQuantityTotal(),
-            t.getQuantitySold(),
-            t.getSaleStart(),
-            t.getSaleEnd(),
-            t.getCreatedAt(),
-            t.getUpdatedAt()
-        );
+                t.getId(),
+                t.getEventId(),
+                t.getName(),
+                t.getPrice(),
+                t.getQuantityTotal(),
+                t.getQuantitySold(),
+                t.getSaleStart(),
+                t.getSaleEnd(),
+                t.getCreatedAt(),
+                t.getUpdatedAt());
     }
 }

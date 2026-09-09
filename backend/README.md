@@ -175,7 +175,7 @@ not change that. Building this image does not deploy anything.
 ## Project layout
 
 ```
-src/main/java/com/project926/backend/
+src/main/java/com/p/backend/
   BackendApplication.java
   config/SecurityConfig.java       # stateless JWT resource-server config
   controller/HealthController.java         # public: GET /api/v1/health

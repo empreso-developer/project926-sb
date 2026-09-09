@@ -84,7 +84,7 @@ export function BookingWidget({ eventId, ticketTypes, eventTitle }: BookingWidge
         description: 'Please sign in to book tickets.',
         variant: 'destructive',
       });
-      router.push('/project926/sign-in');
+      router.push('/p/sign-in');
       return;
     }
 
@@ -103,7 +103,7 @@ export function BookingWidget({ eventId, ticketTypes, eventTitle }: BookingWidge
         .filter(([, q]) => q > 0)
         .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }));
 
-      const res = await fetch('/project926/api/payments/create-order', {
+      const res = await fetch('/p/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventId, items }),
@@ -139,7 +139,7 @@ export function BookingWidget({ eventId, ticketTypes, eventTitle }: BookingWidge
         theme: { color: '#2563eb' },
         handler: async (response) => {
           try {
-            const verifyRes = await fetch('/project926/api/payments/verify', {
+            const verifyRes = await fetch('/p/api/payments/verify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -158,7 +158,7 @@ export function BookingWidget({ eventId, ticketTypes, eventTitle }: BookingWidge
               title: 'Payment successful!',
               description: 'Your booking is confirmed.',
             });
-            router.push(`/project926/dashboard/customer?booking=${data.bookingId}`);
+            router.push(`/p/dashboard/customer?booking=${data.bookingId}`);
           } catch (err) {
             setVerifying(false);
             toast({

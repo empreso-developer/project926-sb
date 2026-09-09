@@ -17,14 +17,14 @@ export default async function ScanTicketsPage({ params }: ScanPageProps) {
     ({ event } = await requireEventOrganizer(eventId));
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Forbidden';
-    if (message === 'Not authenticated') redirect('/project926/sign-in');
+    if (message === 'Not authenticated') redirect('/p/sign-in');
     notFound();
   }
 
   return (
     <div className="container mx-auto max-w-lg px-4 py-8 sm:px-6">
       <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
-        <Link href={`/project926/dashboard/organizer/events/${eventId}`}>
+        <Link href={`/p/dashboard/organizer/events/${eventId}`}>
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           Back to event
         </Link>
@@ -36,7 +36,7 @@ export default async function ScanTicketsPage({ params }: ScanPageProps) {
           <p className="mt-1 text-sm text-muted-foreground">{event.title}</p>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/project926/dashboard/organizer/events/${eventId}/attendees`}>
+          <Link href={`/p/dashboard/organizer/events/${eventId}/attendees`}>
             <Users className="mr-1.5 h-4 w-4" />
             Attendees
           </Link>

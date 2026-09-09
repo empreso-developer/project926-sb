@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Mirrors app/(project926)/project926/api/payments/create-order/route.ts
+ * Mirrors app/(project926)/p/api/payments/create-order/route.ts
  * and .../payments/verify/route.ts. Both require a valid Clerk JWT (Phase
  * A SecurityConfig's default anyRequest().authenticated() — no permitAll
  * matcher exists for /api/v1/payments/**). The authenticated customer id
@@ -32,17 +32,15 @@ public class PaymentController {
 
     @PostMapping("/create-order")
     public CreateOrderResponse createOrder(
-        @AuthenticationPrincipal Jwt jwt,
-        @Valid @RequestBody CreateOrderRequest request
-    ) {
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateOrderRequest request) {
         return paymentService.createOrder(jwt.getSubject(), request);
     }
 
     @PostMapping("/verify")
     public VerifyPaymentResponse verify(
-        @AuthenticationPrincipal Jwt jwt,
-        @Valid @RequestBody VerifyPaymentRequest request
-    ) {
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody VerifyPaymentRequest request) {
         return paymentService.verifyPayment(jwt.getSubject(), request);
     }
 }

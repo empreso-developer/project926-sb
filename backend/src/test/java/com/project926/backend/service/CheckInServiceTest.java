@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Mocked-repository coverage of CheckInService's business-outcome switch —
- * mirrors app/(project926)/project926/api/organizer/events/[eventId]/check-in/route.ts's
+ * mirrors app/(project926)/p/api/organizer/events/[eventId]/check-in/route.ts's
  * status branches exactly (Step 12's check-in test matrix). The
  * database-level atomicity guarantee itself (the guarded UPDATE actually
  * being race-safe across concurrent transactions) is NOT provable with

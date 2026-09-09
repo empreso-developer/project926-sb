@@ -8,8 +8,8 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider
-      signInFallbackRedirectUrl="/project926"
-      signUpFallbackRedirectUrl="/project926"
+      signInFallbackRedirectUrl="/p"
+      signUpFallbackRedirectUrl="/p"
     >
       {children}
     </ClerkProvider>

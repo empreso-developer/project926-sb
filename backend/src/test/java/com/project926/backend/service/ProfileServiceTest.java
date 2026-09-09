@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 /**
- * Mirrors app/(project926)/project926/api/profile/route.ts at the
+ * Mirrors app/(project926)/p/api/profile/route.ts at the
  * data-access level: role lookup by Clerk id, defaulting to "customer"
  * when no profile row exists — no write, no exception.
  */

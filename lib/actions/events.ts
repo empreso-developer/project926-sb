@@ -30,8 +30,8 @@ export async function createEventAction(input: EventInput) {
     body: input,
   });
 
-  revalidatePath('/project926/dashboard/organizer');
-  revalidatePath('/project926/dashboard/organizer/events');
+  revalidatePath('/p/dashboard/organizer');
+  revalidatePath('/p/dashboard/organizer/events');
   return created;
 }
 
@@ -41,23 +41,23 @@ export async function updateEventAction(eventId: string, input: EventInput) {
     body: input,
   });
 
-  revalidatePath('/project926/dashboard/organizer');
-  revalidatePath(`/project926/dashboard/organizer/events/${eventId}`);
-  revalidatePath(`/project926/events/${eventId}`);
+  revalidatePath('/p/dashboard/organizer');
+  revalidatePath(`/p/dashboard/organizer/events/${eventId}`);
+  revalidatePath(`/p/events/${eventId}`);
 }
 
 export async function publishEventAction(eventId: string) {
   await backendFetch(`/api/v1/organizer/events/${eventId}/publish`, { method: 'POST' });
 
-  revalidatePath('/project926/dashboard/organizer');
-  revalidatePath(`/project926/dashboard/organizer/events/${eventId}`);
+  revalidatePath('/p/dashboard/organizer');
+  revalidatePath(`/p/dashboard/organizer/events/${eventId}`);
 }
 
 export async function deleteEventAction(eventId: string) {
   await backendFetch(`/api/v1/organizer/events/${eventId}`, { method: 'DELETE' });
 
-  revalidatePath('/project926/dashboard/organizer');
-  revalidatePath('/project926/dashboard/organizer/events');
+  revalidatePath('/p/dashboard/organizer');
+  revalidatePath('/p/dashboard/organizer/events');
 }
 
 export async function createTicketTypeAction(eventId: string, input: TicketTypeInput) {
@@ -66,7 +66,7 @@ export async function createTicketTypeAction(eventId: string, input: TicketTypeI
     body: input,
   });
 
-  revalidatePath(`/project926/dashboard/organizer/events/${eventId}`);
+  revalidatePath(`/p/dashboard/organizer/events/${eventId}`);
 }
 
 export async function deleteTicketTypeAction(ticketTypeId: string, eventId: string) {
@@ -74,5 +74,5 @@ export async function deleteTicketTypeAction(ticketTypeId: string, eventId: stri
     method: 'DELETE',
   });
 
-  revalidatePath(`/project926/dashboard/organizer/events/${eventId}`);
+  revalidatePath(`/p/dashboard/organizer/events/${eventId}`);
 }
