@@ -2,45 +2,50 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Calendar, MapPin, Plus, Ticket, Users, TrendingUp } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { backendFetch } from '@/lib/backend/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
-import type { EventRow, TicketType, Booking } from '@/lib/types';
+import type { EventRow, TicketType } from '@/lib/types';
 
 interface OrganizerEvent extends EventRow {
   ticket_types: TicketType[];
-  bookings: Booking[];
 }
 
+/**
+ * Phase H: now calls Spring's GET /api/v1/organizer/events
+ * (EventService.listOwnEvents — Phase C) instead of querying Supabase
+ * directly.
+ *
+ * INTENTIONAL DEVIATION (documented in the Phase H report): the original
+ * query joined `bookings(id, status, total_amount)` per event and derived
+ * "Total revenue" and "Confirmed bookings" from it. Spring's organizer
+ * listing endpoint returns EventDto (event + ticket types only, no
+ * bookings) — no Phase A-G endpoint exposes per-organizer booking rows,
+ * and adding one is out of scope for this integration phase.
+ *   - "Total revenue" is still exactly correct: quantity_sold is ONLY ever
+ *     incremented by confirm_booking_and_commit_inventory for a genuinely
+ *     confirmed booking, so sum(ticket_type.price * quantity_sold) equals
+ *     the original sum(confirmed bookings' total_amount) exactly, just
+ *     computed from ticket-type data instead of booking rows.
+ *   - "Confirmed bookings" (a distinct booking COUNT) has no equivalent
+ *     derivation from ticket-type data alone (one booking can span
+ *     multiple line items) — replaced with "Events", a real, correctly
+ *     computable metric, rather than showing a fabricated number.
+ */
 export default async function OrganizerDashboard() {
   const { userId } = await auth();
   if (!userId) return null;
 
-  const { data: events } = await supabaseAdmin
-    .from('events')
-    .select('*, ticket_types(*), bookings(id, status, total_amount)')
-    .eq('organizer_id', userId)
-    .order('created_at', { ascending: false });
-
-  const typedEvents = (events ?? []) as unknown as OrganizerEvent[];
+  const typedEvents = await backendFetch<OrganizerEvent[]>('/api/v1/organizer/events');
 
   const totalRevenue = typedEvents.reduce((sum, e) => {
-    return (
-      sum +
-      e.bookings
-        .filter((b) => b.status === 'confirmed')
-        .reduce((s, b) => s + Number(b.total_amount), 0)
-    );
+    return sum + e.ticket_types.reduce((s, t) => s + Number(t.price) * t.quantity_sold, 0);
   }, 0);
   const totalTicketsSold = typedEvents.reduce((sum, e) => {
     return sum + e.ticket_types.reduce((s, t) => s + t.quantity_sold, 0);
   }, 0);
-  const totalBookings = typedEvents.reduce(
-    (sum, e) => sum + e.bookings.filter((b) => b.status === 'confirmed').length,
-    0,
-  );
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -64,7 +69,7 @@ export default async function OrganizerDashboard() {
         {[
           { label: 'Total revenue', value: formatCurrency(totalRevenue), icon: TrendingUp, color: 'success' },
           { label: 'Tickets sold', value: totalTicketsSold, icon: Ticket, color: 'primary' },
-          { label: 'Confirmed bookings', value: totalBookings, icon: Users, color: 'accent' },
+          { label: 'Events', value: typedEvents.length, icon: Users, color: 'accent' },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} className="p-5 shadow-soft">
             <div className="flex items-center justify-between">

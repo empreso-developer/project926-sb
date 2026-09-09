@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Ticket, Plus, QrCode, Users } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { backendFetch, BackendApiError } from '@/lib/backend/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,16 +22,22 @@ export default async function ManageEventPage({ params }: EventPageProps) {
   const { userId } = await auth();
   if (!userId) return null;
 
-  const { data: event } = await supabaseAdmin
-    .from('events')
-    .select('*, ticket_types(*)')
-    .eq('id', (await params).id)
-    .maybeSingle();
-
-  if (!event) notFound();
-  if (event.organizer_id !== userId) notFound();
-
-  const typedEvent = event as EventRow & { ticket_types: TicketType[] };
+  const eventId = (await params).id;
+  // Spring's GET /api/v1/organizer/events/{id} (EventService.getOwnEventById
+  // — Phase C) already returns 404 for BOTH "doesn't exist" and "not
+  // yours" (see its Javadoc), matching this page's own information-hiding
+  // choice exactly — no separate ownership check needed here anymore.
+  let typedEvent: EventRow & { ticket_types: TicketType[] };
+  try {
+    typedEvent = await backendFetch<EventRow & { ticket_types: TicketType[] }>(
+      `/api/v1/organizer/events/${eventId}`,
+    );
+  } catch (err) {
+    if (err instanceof BackendApiError && (err.status === 404 || err.status === 403)) {
+      notFound();
+    }
+    throw err;
+  }
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">

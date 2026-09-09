@@ -1,157 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { razorpay } from '@/lib/razorpay/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
-import { z } from 'zod';
+import { backendFetchRaw } from '@/lib/backend/client';
 
-const Body = z.object({
-  eventId: z.string().uuid(),
-  items: z
-    .array(
-      z.object({
-        ticketTypeId: z.string().uuid(),
-        quantity: z.number().int().min(1).max(10),
-      }),
-    )
-    .min(1)
-    .max(10),
-});
-
+/**
+ * Phase H: thin proxy to Spring's POST /api/v1/payments/create-order —
+ * business logic (order/booking creation, Razorpay order call, payment
+ * record) now lives entirely in PaymentService (Phase D). This route only
+ * authenticates the caller and forwards the Clerk session token as a
+ * Bearer token; it does not touch Supabase or Razorpay directly anymore.
+ *
+ * The request/response JSON shapes are unchanged (CreateOrderRequest/
+ * CreateOrderResponse use the exact same camelCase field names this route
+ * already sent/received — see their Javadoc), so components/booking-widget.tsx
+ * needed ZERO changes.
+ */
 export async function POST(req: NextRequest) {
+  const { userId, getToken } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let body: unknown;
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
 
-    const json = await req.json();
-    const parsed = Body.safeParse(json);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid request', details: parsed.error.flatten() },
-        { status: 400 },
-      );
-    }
-
-    const { eventId, items } = parsed.data;
-
-    // Verify the event is approved and tickets are available.
-    const { data: event, error: eventErr } = await supabaseAdmin
-      .from('events')
-      .select('id, status, title')
-      .eq('id', eventId)
-      .maybeSingle();
-    if (eventErr) throw eventErr;
-    if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-    }
-    if (event.status !== 'approved') {
-      return NextResponse.json(
-        { error: 'Event is not available for booking' },
-        { status: 400 },
-      );
-    }
-
-    // Fetch ticket types and validate availability.
-    const ttIds = items.map((i) => i.ticketTypeId);
-    const { data: ticketTypes, error: ttErr } = await supabaseAdmin
-      .from('ticket_types')
-      .select('id, name, price, quantity_total, quantity_sold')
-      .in('id', ttIds);
-
-    if (ttErr) throw ttErr;
-    if (!ticketTypes || ticketTypes.length !== ttIds.length) {
-      return NextResponse.json(
-        { error: 'One or more ticket types not found' },
-        { status: 400 },
-      );
-    }
-
-    let totalAmount = 0;
-    for (const item of items) {
-      const tt = ticketTypes.find((t) => t.id === item.ticketTypeId);
-      if (!tt) {
-        return NextResponse.json(
-          { error: `Ticket type ${item.ticketTypeId} not found` },
-          { status: 400 },
-        );
-      }
-      const remaining = tt.quantity_total - tt.quantity_sold;
-      if (item.quantity > remaining) {
-        return NextResponse.json(
-          { error: `Only ${remaining} tickets left for ${tt.name}` },
-          { status: 400 },
-        );
-      }
-      totalAmount += Number(tt.price) * item.quantity;
-    }
-
-    if (totalAmount <= 0) {
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
-    }
-
-    // Create the booking atomically (reserves tickets).
-    const itemsPayload = items.map((i) => ({
-      ticket_type_id: i.ticketTypeId,
-      quantity: i.quantity,
-    }));
-    const { data: bookingId, error: bookingErr } = await supabaseAdmin.rpc(
-      'create_booking_from_items',
-      {
-        p_customer_id: userId,
-        p_event_id: eventId,
-        p_items: itemsPayload,
-      },
-    );
-
-    if (bookingErr) {
-      return NextResponse.json({ error: bookingErr.message }, { status: 400 });
-    }
-    if (!bookingId) {
-      return NextResponse.json(
-        { error: 'Failed to create booking' },
-        { status: 500 },
-      );
-    }
-
-    // Create Razorpay order. Amount is in paise.
-    const order = await razorpay.orders.create({
-      amount: Math.round(totalAmount * 100),
-      currency: 'INR',
-      receipt: `booking_${bookingId.slice(0, 24)}`,
-      notes: {
-        booking_id: bookingId,
-        event_id: eventId,
-        customer_id: userId,
-      },
+  const token = await getToken();
+  // Phase I fix: a network-level failure reaching Spring (not a Spring
+  // error response — an actual fetch() rejection) previously propagated
+  // uncaught, producing Next.js's default HTML error page instead of JSON
+  // — confirmed via live testing with the backend down. Matches the
+  // original route's own outer try/catch -> {error} at 500 shape.
+  try {
+    const { status, data } = await backendFetchRaw('/api/v1/payments/create-order', {
+      method: 'POST',
+      body,
+      token,
     });
-
-    // Persist the payment record.
-    const { error: payErr } = await supabaseAdmin.from('payments').insert({
-      booking_id: bookingId,
-      razorpay_order_id: order.id,
-      amount: totalAmount,
-      currency: 'INR',
-      status: 'created',
-    });
-    if (payErr) {
-      console.error('Failed to create payment record:', payErr);
-      return NextResponse.json(
-        { error: 'Failed to initialize payment' },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({
-      orderId: order.id,
-      bookingId,
-      amount: Math.round(totalAmount * 100),
-      currency: 'INR',
-      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-    });
+    return NextResponse.json(data, { status });
   } catch (err) {
-    console.error('[create-order] error:', err);
-    const message = err instanceof Error ? err.message : 'Internal server error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[create-order] Backend request failed:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

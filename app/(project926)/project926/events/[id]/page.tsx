@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Calendar, Clock, MapPin, ArrowLeft, Ticket } from 'lucide-react';
-import { isMissingSupabaseTableError, supabaseAdmin } from '@/lib/supabase/server';
+import { backendFetch } from '@/lib/backend/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -16,23 +16,22 @@ interface EventPageProps {
   }>
 }
 
+/**
+ * Phase H: now calls Spring's public GET /api/v1/events/{id} (EventService
+ * — Phase B) instead of querying Supabase directly. Same fail-soft-to-null
+ * behavior as the original (any error, including a genuine 404, leads to
+ * notFound() below) — EventDto's shape already matches EventRow &
+ * { ticket_types } exactly.
+ */
 async function getEvent(id: string) {
-  const { data, error } = await supabaseAdmin
-    .from('events')
-    .select('*, ticket_types(*)')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (error) {
+  try {
+    return await backendFetch<EventRow & { ticket_types: TicketType[] }>(`/api/v1/events/${id}`, {
+      authenticated: false,
+    });
+  } catch (error) {
     console.error('Failed to load event:', error);
     return null;
   }
-
-  console.log("ID:", id);
-  console.log("DATA:", data);
-  console.log("ERROR:", error);
-
-  return data as (EventRow & { ticket_types: TicketType[] }) | null;
 }
 
 export default async function EventDetailsPage({ params }: EventPageProps) {

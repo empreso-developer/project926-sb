@@ -254,6 +254,49 @@ public class PaymentService {
             throw new BookingValidationException("Payment amount mismatch");
         }
 
+        return confirmCapturedPayment(booking, payment, request.razorpayPaymentId(), request.razorpaySignature());
+    }
+
+    private void rejectPayment(UUID paymentId, UUID bookingId, String reason, String reference) {
+        log.error("[verify] Rejecting payment for booking {}: {}", reference, reason);
+        paymentRepository.updateStatus(paymentId, "failed");
+        bookingRepository.updateStatus(bookingId, "cancelled");
+    }
+
+    // ================= shared confirmation (verify + Phase G webhook) =================
+
+    /**
+     * The confirmation sequence shared by the browser {@code /verify}
+     * endpoint above and the Razorpay webhook (Phase G,
+     * RazorpayWebhookService): generate the QR, atomically confirm the
+     * booking and commit inventory via the existing, unmodified RPC
+     * (idempotent — see BookingInventoryRepository), mark the payment
+     * paid, and trigger the existing idempotent confirmation email.
+     * Extracted verbatim from verifyPayment's own tail end (Phase D) —
+     * same statements, same order, same exception handling — so both
+     * confirmation paths converge on identical database state
+     * transitions, per the Phase G architectural principle that the
+     * webhook must not become a second, subtly different payment
+     * implementation.
+     *
+     * <p>Callers MUST have already, via their own distinct trust
+     * mechanism, established that {@code razorpayPaymentId} represents a
+     * genuinely captured payment for this exact {@code payment} row
+     * (verify: client-signature check + a live Razorpay API fetch;
+     * webhook: the HMAC-signed webhook body itself, cross-checked against
+     * the local payment record's amount/currency). Callers MUST also have
+     * already handled the case where {@code booking.getStatus()} is
+     * anything other than {@code "pending"} — this method does not
+     * re-check that, so it assumes a genuine first-time confirmation
+     * attempt.
+     *
+     * @param razorpaySignature the browser-flow signature to persist on
+     *                          the payment row, or {@code null} when
+     *                          called from the webhook (which has no such
+     *                          value — the {@code razorpay_signature}
+     *                          column is nullable for exactly this case).
+     */
+    VerifyPaymentResponse confirmCapturedPayment(Booking booking, Payment payment, String razorpayPaymentId, String razorpaySignature) {
         // Generate the QR code (pure function of booking reference/id/event_id
         // — deterministic, so it's identical however many times this runs,
         // exactly matching the existing route's comment). Generated BEFORE
@@ -269,26 +312,26 @@ public class PaymentService {
             newlyConfirmed = bookingInventoryRepository.confirmBookingAndCommitInventory(booking.getId(), qrCode);
         } catch (SoldOutException soldOut) {
             log.error(
-                "[verify] CRITICAL: booking {} paid (razorpay payment {}) but sold out at confirmation — manual refund required: {}",
-                booking.getReference(), request.razorpayPaymentId(), soldOut.getMessage()
+                "[payment-confirm] CRITICAL: booking {} paid (razorpay payment {}) but sold out at confirmation — manual refund required: {}",
+                booking.getReference(), razorpayPaymentId, soldOut.getMessage()
             );
-            paymentRepository.markPaid(payment.getId(), request.razorpayPaymentId(), request.razorpaySignature(), "paid");
+            paymentRepository.markPaid(payment.getId(), razorpayPaymentId, razorpaySignature, "paid");
             bookingRepository.updateStatus(booking.getId(), "cancelled");
             throw soldOut;
         } catch (BookingConfirmationException confirmErr) {
-            log.error("[verify] Failed to confirm booking: {}", confirmErr.getMessage());
+            log.error("[payment-confirm] Failed to confirm booking: {}", confirmErr.getMessage());
             throw confirmErr;
         }
 
         // Mark paid unconditionally — matches the existing route's comment:
         // whether newly confirmed or already confirmed by a concurrent
         // request, this payment did succeed.
-        paymentRepository.markPaid(payment.getId(), request.razorpayPaymentId(), request.razorpaySignature(), "paid");
+        paymentRepository.markPaid(payment.getId(), razorpayPaymentId, razorpaySignature, "paid");
 
         if (newlyConfirmed) {
-            log.info("[verify] Booking {} confirmed, inventory committed", booking.getReference());
+            log.info("[payment-confirm] Booking {} confirmed, inventory committed", booking.getReference());
         } else {
-            log.info("[verify] Booking {} was already confirmed, skipping", booking.getReference());
+            log.info("[payment-confirm] Booking {} was already confirmed, skipping", booking.getReference());
         }
 
         // Email delivery is a secondary notification channel, not the source
@@ -306,11 +349,5 @@ public class PaymentService {
         }
 
         return new VerifyPaymentResponse(true, booking.getId(), booking.getReference(), qrCode);
-    }
-
-    private void rejectPayment(UUID paymentId, UUID bookingId, String reason, String reference) {
-        log.error("[verify] Rejecting payment for booking {}: {}", reference, reason);
-        paymentRepository.updateStatus(paymentId, "failed");
-        bookingRepository.updateStatus(bookingId, "cancelled");
     }
 }

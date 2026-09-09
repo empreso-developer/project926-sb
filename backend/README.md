@@ -19,6 +19,15 @@ and are untouched).
 - Network access to the **development** Supabase Postgres instance and to
   Clerk's JWKS endpoint
 
+**Windows note:** a JDK bug (`WEPollSelectorProvider` failing to open its
+internal loopback pipe) has been observed preventing `java.net.http.HttpClient`
+— and therefore the whole application, via `ResendGateway` — from starting
+natively on some Windows machines, independent of JDK version (reproduced on
+both 17 and 21). If you hit `Unable to establish loopback connection` on
+startup, run the app under WSL2 (native Linux JDK) or Docker (below) instead
+— both sidestep it entirely, since it's specific to the Windows NIO selector
+implementation.
+
 ## Configuration
 
 All configuration is environment variables — nothing is hardcoded, nothing
@@ -85,6 +94,83 @@ mvn test
   (not failed) when dev DB credentials aren't configured, so `mvn test`
   never needs real secrets to pass, and never touches a database it wasn't
   explicitly pointed at.
+
+## Docker (local development only)
+
+A multi-stage `Dockerfile` builds and runs the backend without needing a
+local JDK/Maven at all. This is a **local development convenience**, not a
+production deployment artifact — Supabase, Razorpay, Resend, and Clerk all
+remain external managed services; nothing here stands up local replacements
+for them.
+
+**Architecture:** stage 1 compiles with `maven:3.9.9-eclipse-temurin-21`;
+stage 2 runs the built jar on `eclipse-temurin:21-jre-alpine` as a non-root
+user. Only the compiled jar is copied into the final image — no source, no
+Maven cache, no `.env*` files (excluded from the build context entirely by
+`.dockerignore`, so they can never end up in an image layer).
+
+### Environment variables
+
+Real values come from your existing `backend/.env.dev` (gitignored — see
+[`.env.example`](.env.example) for the placeholder-only template), passed at
+**runtime**, never baked into the image:
+
+```bash
+docker run --rm -p 8080:8080 --env-file .env.dev project926-backend:dev
+```
+
+**CRLF note:** `.env.dev` has Windows line endings. Unlike WSL2's native
+`bash source` (which embeds a stray `\r` into every value and corrupts the
+JDBC URL — see the CRLF/WSL investigation notes if you hit that), Docker's
+`--env-file` / Compose's `env_file:` parser correctly strips CRLF — verified
+empirically before relying on it here. No file changes or extra filtering
+needed; just point `--env-file`/`env_file:` at `.env.dev` directly.
+
+### Build and run
+
+```bash
+cd backend
+docker build -t project926-backend:dev .
+docker run -d --name project926-backend --env-file .env.dev -p 8080:8080 project926-backend:dev
+```
+
+Or with Compose (equivalent, less to type):
+
+```bash
+cd backend
+docker compose up -d --build
+```
+
+### Verify it's running
+
+```bash
+docker ps                               # STATUS should show "healthy" after ~45s
+curl http://localhost:8080/api/v1/health
+# {"status":"UP","database":"UP"}
+```
+
+The container's `HEALTHCHECK` calls this same endpoint and greps the
+response body for `"database":"UP"` — not just an HTTP 200 — since the
+endpoint always returns 200 even when the database is unreachable (see
+`HealthController`). A container stuck at `(unhealthy)` means it's up but
+can't reach the configured database — check your `.env.dev` values, not the
+container itself.
+
+### Stop / remove
+
+```bash
+docker compose down          # if started via compose
+# or
+docker stop project926-backend && docker rm project926-backend
+```
+
+### Dev vs. production
+
+`docker-compose.yml` and the `.env.dev`-based examples above are
+**development only**. `application-prod.yml` remains the placeholder-only
+file it's been since Phase A — no production Supabase/Razorpay/Resend/Clerk
+credentials are wired up anywhere in this repo, and this Docker setup does
+not change that. Building this image does not deploy anything.
 
 ## Project layout
 

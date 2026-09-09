@@ -37,6 +37,10 @@ razorpay:
   key-id: ${RAZORPAY_KEY_ID}
   key-secret: ${RAZORPAY_KEY_SECRET}
   public-key-id: ${RAZORPAY_PUBLIC_KEY_ID:${RAZORPAY_KEY_ID}}
+  # Phase G: separate secret Razorpay signs webhook deliveries with — not
+  # the same value as key-secret. Same env var name .env.example already
+  # reserved (RAZORPAY_WEBHOOK_SECRET), never previously wired to any code.
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
 
 # Resend — same env var names as lib/resend/server.ts exactly (not renamed).
 # RESEND_REPLY_TO stays optional there too (falls back to undefined/unset).

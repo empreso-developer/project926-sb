@@ -22,6 +22,7 @@ razorpay:
   key-id: ${RAZORPAY_KEY_ID}
   key-secret: ${RAZORPAY_KEY_SECRET}
   public-key-id: ${RAZORPAY_PUBLIC_KEY_ID:${RAZORPAY_KEY_ID}}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
 
 resend:
   api-key: ${RESEND_API_KEY}

@@ -1,76 +1,45 @@
 'use server';
 import { revalidatePath } from 'next/cache';
-import { auth } from '@clerk/nextjs/server';
-import { z } from 'zod';
-import { supabaseAdmin } from '@/lib/supabase/server';
-import { EventSchema, TicketTypeSchema,
-    type EventInput, type TicketTypeInput } from '@/lib/validations/event';
+import { backendFetch } from '@/lib/backend/client';
+import { type EventInput, type TicketTypeInput } from '@/lib/validations/event';
+
+/**
+ * Phase H: these server actions now call Spring's
+ * /api/v1/organizer/events/** endpoints (EventService/TicketTypeService —
+ * Phase C) instead of Supabase directly. Authorization (organizer/admin
+ * role, event ownership) is now Spring's responsibility, not this file's —
+ * see EventService for the exact rules being enforced.
+ *
+ * EventInput/TicketTypeInput (lib/validations/event.ts) already use the
+ * exact snake_case field names (event_date, banner_url, quantity_total,
+ * ...) Spring's CreateEventRequest/CreateTicketTypeRequest expect on the
+ * wire (application.yml's global SNAKE_CASE Jackson strategy), so no field
+ * mapping is needed — the validated input is forwarded as-is.
+ *
+ * backendFetch throws BackendApiError (a subclass of Error, message =
+ * Spring's `error` field) on any non-2xx response — every call site here
+ * already just lets that propagate to the calling client component's
+ * existing try/catch (event-form.tsx, ticket-type-manager.tsx,
+ * publish-event-button.tsx), matching the exact `throw new Error(...)`
+ * behavior this replaces.
+ */
 
 export async function createEventAction(input: EventInput) {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Not authenticated');
-
-  const parsed = EventSchema.safeParse(input);
-  if (!parsed.success) {
-    throw new Error('Invalid event data');
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from('events')
-    .insert({
-      organizer_id: userId,
-      title: parsed.data.title,
-      description: parsed.data.description,
-      event_date: parsed.data.event_date,
-      event_time: parsed.data.event_time,
-      venue: parsed.data.venue,
-      city: parsed.data.city,
-      banner_url: parsed.data.banner_url,
-      status: 'draft',
-    })
-    .select('id')
-    .single();
-
-  if (error) throw new Error(error.message);
+  const created = await backendFetch<{ id: string }>('/api/v1/organizer/events', {
+    method: 'POST',
+    body: input,
+  });
 
   revalidatePath('/project926/dashboard/organizer');
   revalidatePath('/project926/dashboard/organizer/events');
-  return data;
+  return created;
 }
 
 export async function updateEventAction(eventId: string, input: EventInput) {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Not authenticated');
-
-  const parsed = EventSchema.safeParse(input);
-  if (!parsed.success) {
-    throw new Error('Invalid event data');
-  }
-
-  // Verify ownership
-  const { data: existing, error: fetchErr } = await supabaseAdmin
-    .from('events')
-    .select('organizer_id')
-    .eq('id', eventId)
-    .maybeSingle();
-  if (fetchErr) throw fetchErr;
-  if (!existing) throw new Error('Event not found');
-  if (existing.organizer_id !== userId) throw new Error('Forbidden');
-
-  const { error } = await supabaseAdmin
-    .from('events')
-    .update({
-      title: parsed.data.title,
-      description: parsed.data.description,
-      event_date: parsed.data.event_date,
-      event_time: parsed.data.event_time,
-      venue: parsed.data.venue,
-      city: parsed.data.city,
-      banner_url: parsed.data.banner_url,
-    })
-    .eq('id', eventId);
-
-  if (error) throw new Error(error.message);
+  await backendFetch(`/api/v1/organizer/events/${eventId}`, {
+    method: 'PUT',
+    body: input,
+  });
 
   revalidatePath('/project926/dashboard/organizer');
   revalidatePath(`/project926/dashboard/organizer/events/${eventId}`);
@@ -78,92 +47,32 @@ export async function updateEventAction(eventId: string, input: EventInput) {
 }
 
 export async function publishEventAction(eventId: string) {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Not authenticated');
-
-  const { data: existing } = await supabaseAdmin
-    .from('events')
-    .select('organizer_id')
-    .eq('id', eventId)
-    .maybeSingle();
-  if (!existing) throw new Error('Event not found');
-  if (existing.organizer_id !== userId) throw new Error('Forbidden');
-
-  const { error } = await supabaseAdmin
-    .from('events')
-    .update({ status: 'published' })
-    .eq('id', eventId);
-  if (error) throw error;
+  await backendFetch(`/api/v1/organizer/events/${eventId}/publish`, { method: 'POST' });
 
   revalidatePath('/project926/dashboard/organizer');
   revalidatePath(`/project926/dashboard/organizer/events/${eventId}`);
 }
 
 export async function deleteEventAction(eventId: string) {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Not authenticated');
-
-  const { data: existing } = await supabaseAdmin
-    .from('events')
-    .select('organizer_id')
-    .eq('id', eventId)
-    .maybeSingle();
-  if (!existing) throw new Error('Event not found');
-  if (existing.organizer_id !== userId) throw new Error('Forbidden');
-
-  const { error } = await supabaseAdmin.from('events').delete().eq('id', eventId);
-  if (error) throw error;
+  await backendFetch(`/api/v1/organizer/events/${eventId}`, { method: 'DELETE' });
 
   revalidatePath('/project926/dashboard/organizer');
-  revalidatePath(`/project926/dashboard/organizer/events`);
+  revalidatePath('/project926/dashboard/organizer/events');
 }
 
 export async function createTicketTypeAction(eventId: string, input: TicketTypeInput) {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Not authenticated');
-
-  const parsed = TicketTypeSchema.safeParse(input);
-  if (!parsed.success) throw new Error('Invalid ticket type');
-
-  const { data: event } = await supabaseAdmin
-    .from('events')
-    .select('organizer_id')
-    .eq('id', eventId)
-    .maybeSingle();
-  if (!event) throw new Error('Event not found');
-  if (event.organizer_id !== userId) throw new Error('Forbidden');
-
-  const { error } = await supabaseAdmin.from('ticket_types').insert({
-    event_id: eventId,
-    name: parsed.data.name,
-    price: parsed.data.price,
-    quantity_total: parsed.data.quantity_total,
-    sale_start: parsed.data.sale_start,
-    sale_end: parsed.data.sale_end,
+  await backendFetch(`/api/v1/organizer/events/${eventId}/ticket-types`, {
+    method: 'POST',
+    body: input,
   });
-  if (error) throw error;
 
   revalidatePath(`/project926/dashboard/organizer/events/${eventId}`);
 }
 
 export async function deleteTicketTypeAction(ticketTypeId: string, eventId: string) {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Not authenticated');
-
-  const { data: tt } = await supabaseAdmin
-    .from('ticket_types')
-    .select('event_id, events(organizer_id)')
-    .eq('id', ticketTypeId)
-    .maybeSingle();
-  if (!tt) throw new Error('Ticket type not found');
-  const organizerId = (tt.events as unknown as { organizer_id: string } | null)?.organizer_id;
-  if (organizerId !== userId) throw new Error('Forbidden');
-
-  const { error } = await supabaseAdmin
-    .from('ticket_types')
-    .delete()
-    .eq('id', ticketTypeId);
-  if (error) throw error;
+  await backendFetch(`/api/v1/organizer/events/${eventId}/ticket-types/${ticketTypeId}`, {
+    method: 'DELETE',
+  });
 
   revalidatePath(`/project926/dashboard/organizer/events/${eventId}`);
 }

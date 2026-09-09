@@ -9,4 +9,7 @@ import java.util.UUID;
 public interface BookingItemRepository extends JpaRepository<BookingItem, UUID> {
 
     List<BookingItem> findByBookingId(UUID bookingId);
+
+    /** Batch-fetch for a set of bookings (attendee stats / listing) — avoids N+1. */
+    List<BookingItem> findByBookingIdIn(List<UUID> bookingIds);
 }

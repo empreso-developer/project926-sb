@@ -39,6 +39,13 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/api/v1/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/events", "/api/v1/events/**").permitAll()
+                // Phase G: the Razorpay webhook is a public,
+                // machine-to-machine endpoint — Razorpay never holds a
+                // Clerk JWT. Its own security is the X-Razorpay-Signature
+                // HMAC check (RazorpayWebhookSignatureVerifier), performed
+                // inside the controller itself, not here. Narrowly scoped
+                // to this exact POST path only — no broad /api/** exemption.
+                .requestMatchers(HttpMethod.POST, "/api/v1/webhooks/razorpay").permitAll()
                 .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));
 

@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, QrCode, Search, Ticket, UserCheck, Users } from 'lucide-react';
-import { supabaseAdmin } from '@/lib/supabase/server';
-import { requireEventOrganizer } from '@/lib/auth/server';
+import { backendFetch, BackendApiError } from '@/lib/backend/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,8 +24,6 @@ import {
 } from '@/components/ui/pagination';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 
-const PAGE_SIZE = 25;
-
 interface AttendeesPageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ page?: string; q?: string; filter?: string }>;
@@ -43,102 +40,61 @@ interface AttendeeRow {
   tickets: Array<{ name: string; quantity: number }>;
 }
 
+interface AttendeeListResponse {
+  attendees: AttendeeRow[];
+  stats: { total_sold: number; checked_in_qty: number; not_checked_in_qty: number; check_in_rate: number };
+  page: number;
+  page_size: number;
+  total_pages: number;
+  total_count: number;
+}
+
+/**
+ * Phase H: now calls Spring's GET /api/v1/organizer/events/{id}/attendees
+ * (AttendeeService — Phase F) for stats/search/filter/pagination — all
+ * previously three separate hand-written Supabase queries in this page,
+ * now Spring's responsibility. The organizer-OR-admin authorization check
+ * (requireEventOrganizerOrAdmin) happens INSIDE that call; a 403/404 from
+ * it drives the same notFound()/redirect() outcome the original page's own
+ * requireEventOrganizer() call produced.
+ *
+ * The event's title (needed for display, not part of AttendeeListResponse)
+ * comes from the separate PUBLIC GET /api/v1/events/{id} — deliberately
+ * NOT the organizer-only "own event" endpoint, since that one has no admin
+ * bypass (Phase C) and would incorrectly 404 an admin viewing another
+ * organizer's attendees page. The public endpoint has no such restriction
+ * (any event's title is public), so it is safe to use purely for display —
+ * the actual authorization is still enforced by the attendees call itself.
+ */
 export default async function AttendeesPage({ params, searchParams }: AttendeesPageProps) {
   const eventId = (await params).id;
-
-  let event;
-  try {
-    ({ event } = await requireEventOrganizer(eventId));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Forbidden';
-    if (message === 'Not authenticated') redirect('/project926/sign-in');
-    notFound();
-  }
-
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
   const filter = sp.filter === 'checked_in' || sp.filter === 'not_checked_in' ? sp.filter : 'all';
   const search = (sp.q ?? '').trim();
 
-  // Event-level stats: computed from confirmed booking_items.quantity, not
-  // booking counts, so a booking with quantity > 1 is weighted correctly.
-  const { data: statsRows } = await supabaseAdmin
-    .from('booking_items')
-    .select('quantity, bookings!inner(event_id, status, checked_in_at)')
-    .eq('bookings.event_id', eventId)
-    .eq('bookings.status', 'confirmed');
-  const typedStats =
-    (statsRows as unknown as Array<{ quantity: number; bookings: { checked_in_at: string | null } }>) ?? [];
-  const totalSold = typedStats.reduce((s, r) => s + r.quantity, 0);
-  const checkedInQty = typedStats
-    .filter((r) => r.bookings.checked_in_at)
-    .reduce((s, r) => s + r.quantity, 0);
-  const notCheckedInQty = totalSold - checkedInQty;
-  const checkInRate = totalSold > 0 ? (checkedInQty / totalSold) * 100 : 0;
+  const qs = new URLSearchParams({ page: String(page) });
+  if (filter !== 'all') qs.set('filter', filter);
+  if (search) qs.set('q', search);
 
-  // Resolve search -> candidate booking ids (name/email against profiles,
-  // reference directly against bookings) before the main paginated query.
-  let searchBookingIds: string[] | null = null;
-  if (search) {
-    const escaped = search.replace(/[%_,()]/g, (c) => `\\${c}`);
-    const { data: matchingProfiles } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .or(`first_name.ilike.%${escaped}%,last_name.ilike.%${escaped}%,email.ilike.%${escaped}%`);
-    const profileIds = (matchingProfiles ?? []).map((p) => p.id);
-
-    const orParts = [`reference.ilike.%${escaped}%`];
-    if (profileIds.length > 0) {
-      orParts.push(`customer_id.in.(${profileIds.join(',')})`);
+  let event: { title: string };
+  let attendeeData: AttendeeListResponse;
+  try {
+    [event, attendeeData] = await Promise.all([
+      backendFetch<{ title: string }>(`/api/v1/events/${eventId}`, { authenticated: false }),
+      backendFetch<AttendeeListResponse>(`/api/v1/organizer/events/${eventId}/attendees?${qs.toString()}`),
+    ]);
+  } catch (err) {
+    if (err instanceof BackendApiError) {
+      if (err.status === 401) redirect('/project926/sign-in');
+      notFound();
     }
-    const { data: matchingBookings } = await supabaseAdmin
-      .from('bookings')
-      .select('id')
-      .eq('event_id', eventId)
-      .eq('status', 'confirmed')
-      .or(orParts.join(','));
-    searchBookingIds = (matchingBookings ?? []).map((b) => b.id);
+    throw err;
   }
 
-  let query = supabaseAdmin
-    .from('bookings')
-    .select(
-      'id, reference, total_amount, created_at, checked_in_at, customer:profiles!bookings_customer_id_fkey(first_name,last_name,email), booking_items(quantity, ticket_type:ticket_types(name))',
-      { count: 'exact' },
-    )
-    .eq('event_id', eventId)
-    .eq('status', 'confirmed')
-    .order('created_at', { ascending: false });
-
-  if (filter === 'checked_in') query = query.not('checked_in_at', 'is', null);
-  if (filter === 'not_checked_in') query = query.is('checked_in_at', null);
-  if (searchBookingIds !== null) query = query.in('id', searchBookingIds);
-
-  const from = (page - 1) * PAGE_SIZE;
-  const { data: bookings, count } = await query.range(from, from + PAGE_SIZE - 1);
-
-  const rows: AttendeeRow[] = (
-    (bookings as unknown as Array<{
-      id: string;
-      reference: string;
-      total_amount: number;
-      created_at: string;
-      checked_in_at: string | null;
-      customer: { first_name: string | null; last_name: string | null; email: string } | null;
-      booking_items: Array<{ quantity: number; ticket_type: { name: string } | null }>;
-    }>) ?? []
-  ).map((b) => ({
-    id: b.id,
-    reference: b.reference,
-    total_amount: Number(b.total_amount),
-    created_at: b.created_at,
-    checked_in_at: b.checked_in_at,
-    customer_name: [b.customer?.first_name, b.customer?.last_name].filter(Boolean).join(' ') || 'Guest',
-    customer_email: b.customer?.email ?? '',
-    tickets: b.booking_items.map((i) => ({ name: i.ticket_type?.name ?? 'Ticket', quantity: i.quantity })),
-  }));
-
-  const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
+  const { total_sold: totalSold, checked_in_qty: checkedInQty, not_checked_in_qty: notCheckedInQty, check_in_rate: checkInRate } = attendeeData.stats;
+  const rows = attendeeData.attendees;
+  const totalPages = Math.max(1, attendeeData.total_pages);
 
   const buildHref = (overrides: Record<string, string | undefined>) => {
     const next = new URLSearchParams();

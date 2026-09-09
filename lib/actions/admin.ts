@@ -2,9 +2,42 @@
 
 import { revalidatePath } from 'next/cache';
 import { auth } from '@clerk/nextjs/server';
+import { backendFetch } from '@/lib/backend/client';
 import { supabaseAdmin } from '@/lib/supabase/server';
 
-async function requireAdmin() {
+/**
+ * Phase H: approve/reject/remove now call Spring's
+ * /api/v1/admin/events/** endpoints (EventModerationService — Phase C).
+ * The admin-role check (previously this file's local requireAdmin()) is
+ * now Spring's responsibility.
+ *
+ * updateProfileRoleAction has NO Spring equivalent — no phase A-G ever
+ * built a profile-role-management endpoint — so it is intentionally left
+ * calling Supabase directly (see the Phase H report's "Remaining Next.js
+ * Backend Calls" section). Inventing a new Spring endpoint for it was out
+ * of scope for a frontend/backend integration phase.
+ */
+
+export async function approveEventAction(eventId: string) {
+  await backendFetch(`/api/v1/admin/events/${eventId}/approve`, { method: 'POST' });
+  revalidatePath('/project926/dashboard/admin');
+  revalidatePath(`/project926/events/${eventId}`);
+  revalidatePath('/project926');
+}
+
+export async function rejectEventAction(eventId: string) {
+  await backendFetch(`/api/v1/admin/events/${eventId}/reject`, { method: 'POST' });
+  revalidatePath('/project926/dashboard/admin');
+  revalidatePath('/project926');
+}
+
+export async function removeEventAction(eventId: string) {
+  await backendFetch(`/api/v1/admin/events/${eventId}`, { method: 'DELETE' });
+  revalidatePath('/project926/dashboard/admin');
+  revalidatePath('/project926');
+}
+
+export async function updateProfileRoleAction(profileId: string, role: 'customer' | 'organizer' | 'admin') {
   const { userId } = await auth();
   if (!userId) throw new Error('Not authenticated');
   const { data: profile } = await supabaseAdmin
@@ -13,41 +46,7 @@ async function requireAdmin() {
     .eq('id', userId)
     .maybeSingle();
   if (!profile || profile.role !== 'admin') throw new Error('Forbidden');
-}
 
-export async function approveEventAction(eventId: string) {
-  await requireAdmin();
-  const { error } = await supabaseAdmin
-    .from('events')
-    .update({ status: 'approved' })
-    .eq('id', eventId);
-  if (error) throw error;
-  revalidatePath('/project926/dashboard/admin');
-  revalidatePath(`/project926/events/${eventId}`);
-  revalidatePath('/project926');
-}
-
-export async function rejectEventAction(eventId: string) {
-  await requireAdmin();
-  const { error } = await supabaseAdmin
-    .from('events')
-    .update({ status: 'rejected' })
-    .eq('id', eventId);
-  if (error) throw error;
-  revalidatePath('/project926/dashboard/admin');
-  revalidatePath('/project926');
-}
-
-export async function removeEventAction(eventId: string) {
-  await requireAdmin();
-  const { error } = await supabaseAdmin.from('events').delete().eq('id', eventId);
-  if (error) throw error;
-  revalidatePath('/project926/dashboard/admin');
-  revalidatePath('/project926');
-}
-
-export async function updateProfileRoleAction(profileId: string, role: 'customer' | 'organizer' | 'admin') {
-  await requireAdmin();
   const { error } = await supabaseAdmin
     .from('profiles')
     .update({ role })

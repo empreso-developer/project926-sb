@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { Calendar, MapPin, Shield, Ticket, Users, Check, X, Trash2, ArrowUpRight } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
+import { backendFetch } from '@/lib/backend/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,20 +13,49 @@ import { AdminEventActions } from '@/components/admin-event-actions';
 import { AdminRoleSelect } from '@/components/admin-role-select';
 import type { EventRow, Profile, Booking } from '@/lib/types';
 
+interface AdminEvent {
+  id: string;
+  organizer_id: string;
+  organizer_email: string;
+  organizer_first_name: string | null;
+  organizer_last_name: string | null;
+  title: string;
+  description: string | null;
+  event_date: string;
+  event_time: string;
+  venue: string;
+  city: string;
+  banner_url: string | null;
+  status: EventRow['status'];
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Phase H: the events list/table now calls Spring's GET /api/v1/admin/events
+ * (EventModerationService — Phase C), which already returns the joined
+ * organizer email/name (AdminEventDto). Approve/reject/remove (lib/actions/admin.ts)
+ * also now call Spring.
+ *
+ * INTENTIONAL, DOCUMENTED GAP (Phase H report "Remaining Next.js Backend
+ * Calls"): the "Total users" stat, the "Revenue" stat, and the entire
+ * Users table (with AdminRoleSelect) still query Supabase directly —
+ * no phase A-G built an admin "list all profiles" or "platform-wide
+ * revenue" endpoint, and inventing one is out of scope for a frontend/
+ * backend integration phase. This page is intentionally a hybrid during
+ * Phase H.
+ */
 export default async function AdminDashboard() {
   const { userId } = await auth();
   if (!userId) return null;
 
-  const [{ data: profiles }, { data: events }, { data: bookings }] = await Promise.all([
+  const [typedEvents, { data: profiles }, { data: bookings }] = await Promise.all([
+    backendFetch<AdminEvent[]>('/api/v1/admin/events'),
     supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false }),
-    supabaseAdmin.from('events').select('*, organizer:profiles!events_organizer_id_fkey(*)').order('created_at', { ascending: false }),
     supabaseAdmin.from('bookings').select('id, status, total_amount'),
   ]);
 
   const typedProfiles = (profiles ?? []) as Profile[];
-  const typedEvents = (events ?? []) as unknown as (EventRow & {
-    organizer: Profile | null;
-  })[];
   const typedBookings = (bookings ?? []) as Pick<Booking, 'id' | 'status' | 'total_amount'>[];
 
   const pendingEvents = typedEvents.filter((e) => e.status === 'published');
@@ -116,7 +146,7 @@ export default async function AdminDashboard() {
                       </span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Organizer: {e.organizer?.email ?? 'Unknown'}
+                      Organizer: {e.organizer_email ?? 'Unknown'}
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-2">
@@ -170,7 +200,7 @@ export default async function AdminDashboard() {
                     <td className="px-4 py-3">{formatDate(e.event_date)}</td>
                     <td className="px-4 py-3">{e.city}</td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {e.organizer?.email ?? '—'}
+                      {e.organizer_email ?? '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">

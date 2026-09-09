@@ -11,21 +11,17 @@ import java.util.UUID;
 
 /**
  * Maps to the existing {@code bookings} table (see supabase/schema.sql).
- * checked_in_at/checked_in_by (a later, not-yet-migrated check-in phase)
- * are still intentionally NOT mapped here; Hibernate's
- * {@code ddl-auto=validate} only validates columns that ARE mapped, so
- * omitting them is safe and avoids scope creep into that phase's concerns.
- * ticket_email_sent_at/ticket_email_error (Phase E) are now mapped.
+ * checked_in_at/checked_in_by (Phase F) and ticket_email_sent_at/
+ * ticket_email_error (Phase E) are now all mapped.
  *
- * No entity mutation happens for status/total_amount/qr_code — those are
- * exclusively written by the existing create_booking_from_items /
- * confirm_booking_and_commit_inventory RPCs (see BookingInventoryGateway),
- * never by Java-side UPDATEs, so this entity has no setters for them. The
- * one Java-side mutation this phase performs (extending expires_at, and the
- * post-payment status transitions) goes through explicit
- * BookingRepository @Modifying queries — one UPDATE statement per existing
- * `.update().eq()` call, not entity dirty-checking — to reproduce the
- * existing code's exact statement-level behavior.
+ * No entity mutation happens for status/total_amount/qr_code/checked_in_at/
+ * checked_in_by — those are exclusively written either by the existing
+ * create_booking_from_items/confirm_booking_and_commit_inventory RPCs (see
+ * BookingInventoryRepository) or by explicit BookingRepository
+ * @Modifying queries (one UPDATE statement per existing
+ * `.update().eq()`/guarded-UPDATE call, not entity dirty-checking) — never
+ * by mutating a loaded Booking object and calling save(). This entity has
+ * no setters for exactly that reason.
  */
 @Entity
 @Table(name = "bookings")
@@ -61,6 +57,13 @@ public class Booking {
 
     @Column(name = "ticket_email_error")
     private String ticketEmailError;
+
+    @Column(name = "checked_in_at")
+    private OffsetDateTime checkedInAt;
+
+    /** Clerk id of the organizer/admin who checked this booking in — text, references profiles(id), same reasoning as customerId. */
+    @Column(name = "checked_in_by")
+    private String checkedInBy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -110,6 +113,14 @@ public class Booking {
 
     public String getTicketEmailError() {
         return ticketEmailError;
+    }
+
+    public OffsetDateTime getCheckedInAt() {
+        return checkedInAt;
+    }
+
+    public String getCheckedInBy() {
+        return checkedInBy;
     }
 
     public OffsetDateTime getCreatedAt() {

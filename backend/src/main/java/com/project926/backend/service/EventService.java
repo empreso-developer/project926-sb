@@ -181,6 +181,35 @@ public class EventService {
         return toDto(event);
     }
 
+    /**
+     * Mirrors lib/auth/server.ts#requireEventOrganizer exactly — reused by
+     * the attendee listing and check-in endpoints (Phase F), the same way
+     * the original function is shared by the attendees page, scanner page,
+     * and check-in route. DISTINCT from requireOwnedEvent above: this one
+     * DOES allow a platform admin to act on any event regardless of
+     * ownership (`event.organizer_id === userId OR profile?.role ===
+     * 'admin'`), matching the original function's own logic — unlike the
+     * organizer-CRUD actions in lib/actions/events.ts, which never allow an
+     * admin bypass. The two are genuinely different authorization rules in
+     * the existing app, not a discrepancy to reconcile.
+     *
+     * The 'Not authenticated' branch from the original is not reproduced:
+     * in this Spring app, reaching this method at all already implies
+     * Spring Security accepted a valid Clerk JWT (that authentication
+     * check happens centrally, before any controller runs), so that
+     * specific outcome is structurally unreachable here — same reasoning
+     * already applied throughout Phases B/C.
+     */
+    @Transactional(readOnly = true)
+    public Event requireEventOrganizerOrAdmin(UUID eventId, String callerId) {
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> new EventNotFoundException(eventId));
+        if (event.getOrganizerId().equals(callerId) || profileService.isAdmin(callerId)) {
+            return event;
+        }
+        throw new ForbiddenException("Forbidden");
+    }
+
     private Event requireOwnedEvent(UUID eventId, String callerId) {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException(eventId));

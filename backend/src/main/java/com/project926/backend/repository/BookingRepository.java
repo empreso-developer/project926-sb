@@ -1,6 +1,8 @@
 package com.project926.backend.repository;
 
 import com.project926.backend.entity.Booking;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -8,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
@@ -57,4 +61,73 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Transactional
     @Query("UPDATE Booking b SET b.ticketEmailError = :error WHERE b.id = :id")
     void recordTicketEmailError(@Param("id") UUID id, @Param("error") String error);
+
+    /** Mirrors the check-in route's manual-fallback lookup: {@code .eq('reference', reference)}. */
+    Optional<Booking> findByReference(String reference);
+
+    /**
+     * Mirrors the attendees page's stats query source rows: all confirmed
+     * bookings for the event (used to compute totalSold/checkedInQty from
+     * their booking_items — see AttendeeService).
+     */
+    List<Booking> findByEventIdAndStatus(UUID eventId, String status);
+
+    /**
+     * THE atomic, guarded check-in — mirrors the existing route's exact
+     * statement:
+     * {@code .update({checked_in_at, checked_in_by}).eq('id',bookingId).eq('event_id',eventId).eq('status','confirmed').is('checked_in_at',null)}
+     * — a single UPDATE...WHERE, not a read-then-write. The event
+     * relationship is part of THIS guarded statement (not a separate Java
+     * check beforehand), so a booking for a different event can never be
+     * checked in via this call regardless of what the caller believes the
+     * booking's event to be — the WHERE clause is the actual authority.
+     * Two concurrent calls for the same booking serialize on Postgres's row
+     * lock; the second to commit re-evaluates {@code checked_in_at IS NULL}
+     * against the now-committed row and updates zero rows. Returns rows
+     * affected (0 or 1) so the caller can tell whether IT won the race.
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Booking b SET b.checkedInAt = :checkedInAt, b.checkedInBy = :checkedInBy " +
+        "WHERE b.id = :bookingId AND b.eventId = :eventId AND b.status = 'confirmed' AND b.checkedInAt IS NULL")
+    int checkIn(
+        @Param("bookingId") UUID bookingId,
+        @Param("eventId") UUID eventId,
+        @Param("checkedInAt") OffsetDateTime checkedInAt,
+        @Param("checkedInBy") String checkedInBy
+    );
+
+    /**
+     * Mirrors the attendees page's main paginated query exactly:
+     * {@code .eq('event_id',eventId).eq('status','confirmed')}, optional
+     * checked-in filter, optional search (booking reference OR customer
+     * name/email — via an EXISTS subquery against profiles rather than a
+     * JPA relationship, consistent with this project's existing style of
+     * not adding entity associations purely for one query), ordered by
+     * created_at descending, paginated.
+     *
+     * {@code filter} is one of "all"/"checked_in"/"not_checked_in";
+     * {@code searchPattern} is either "" (no search — matches the existing
+     * `if (search)` branch being skipped entirely) or a lowercase
+     * "%term%" LIKE pattern.
+     */
+    @Query(
+        value = "SELECT b FROM Booking b WHERE b.eventId = :eventId AND b.status = 'confirmed' " +
+            "AND (:filter = 'all' OR (:filter = 'checked_in' AND b.checkedInAt IS NOT NULL) OR (:filter = 'not_checked_in' AND b.checkedInAt IS NULL)) " +
+            "AND (:searchPattern = '' OR LOWER(b.reference) LIKE :searchPattern ESCAPE '\\' " +
+            "     OR EXISTS (SELECT 1 FROM Profile p WHERE p.id = b.customerId AND " +
+            "                (LOWER(COALESCE(p.firstName, '')) LIKE :searchPattern ESCAPE '\\' OR LOWER(COALESCE(p.lastName, '')) LIKE :searchPattern ESCAPE '\\' OR LOWER(p.email) LIKE :searchPattern ESCAPE '\\'))) " +
+            "ORDER BY b.createdAt DESC",
+        countQuery = "SELECT COUNT(b) FROM Booking b WHERE b.eventId = :eventId AND b.status = 'confirmed' " +
+            "AND (:filter = 'all' OR (:filter = 'checked_in' AND b.checkedInAt IS NOT NULL) OR (:filter = 'not_checked_in' AND b.checkedInAt IS NULL)) " +
+            "AND (:searchPattern = '' OR LOWER(b.reference) LIKE :searchPattern ESCAPE '\\' " +
+            "     OR EXISTS (SELECT 1 FROM Profile p WHERE p.id = b.customerId AND " +
+            "                (LOWER(COALESCE(p.firstName, '')) LIKE :searchPattern ESCAPE '\\' OR LOWER(COALESCE(p.lastName, '')) LIKE :searchPattern ESCAPE '\\' OR LOWER(p.email) LIKE :searchPattern ESCAPE '\\')))"
+    )
+    Page<Booking> findAttendees(
+        @Param("eventId") UUID eventId,
+        @Param("filter") String filter,
+        @Param("searchPattern") String searchPattern,
+        Pageable pageable
+    );
 }

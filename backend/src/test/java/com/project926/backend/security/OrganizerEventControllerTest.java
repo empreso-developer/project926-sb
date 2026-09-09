@@ -2,10 +2,15 @@ package com.project926.backend.security;
 
 import com.project926.backend.config.SecurityConfig;
 import com.project926.backend.controller.OrganizerEventController;
+import com.project926.backend.dto.AttendeeListResponse;
+import com.project926.backend.dto.AttendeeStatsDto;
+import com.project926.backend.dto.CheckInResponse;
 import com.project926.backend.dto.EventDto;
 import com.project926.backend.exception.EventNotFoundException;
 import com.project926.backend.exception.ForbiddenException;
 import com.project926.backend.exception.GlobalExceptionHandler;
+import com.project926.backend.service.AttendeeService;
+import com.project926.backend.service.CheckInService;
 import com.project926.backend.service.EventService;
 import com.project926.backend.service.TicketTypeService;
 import org.junit.jupiter.api.Test;
@@ -54,6 +59,12 @@ class OrganizerEventControllerTest {
 
     @MockBean
     private TicketTypeService ticketTypeService;
+
+    @MockBean
+    private AttendeeService attendeeService;
+
+    @MockBean
+    private CheckInService checkInService;
 
     private static final String CALLER_ID = "user_caller00000000000000";
 
@@ -208,5 +219,191 @@ class OrganizerEventControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(invalidBody))
             .andExpect(status().isBadRequest());
+    }
+
+    // ---- Phase F: attendee listing ---------------------------------------
+
+    @Test
+    void listAttendees_withoutToken_returns401() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        mockMvc.perform(get("/api/v1/organizer/events/" + eventId + "/attendees"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listAttendees_forbiddenFromService_returns403() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        when(attendeeService.listAttendees(eq(eventId), eq(CALLER_ID), any(), any(), any()))
+            .thenThrow(new ForbiddenException("Forbidden"));
+
+        mockMvc.perform(get("/api/v1/organizer/events/" + eventId + "/attendees")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID))))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listAttendees_notFoundFromService_returns404() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        when(attendeeService.listAttendees(eq(eventId), eq(CALLER_ID), any(), any(), any()))
+            .thenThrow(new EventNotFoundException(eventId));
+
+        mockMvc.perform(get("/api/v1/organizer/events/" + eventId + "/attendees")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID))))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listAttendees_succeeds_forwardsQueryParamsAndReturns200() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        AttendeeListResponse response = new AttendeeListResponse(
+            List.of(), new AttendeeStatsDto(0, 0, 0, 0.0), 2, 25, 1, 0
+        );
+        when(attendeeService.listAttendees(eventId, CALLER_ID, 2, "checked_in", "ada"))
+            .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/organizer/events/" + eventId + "/attendees")
+                .param("page", "2")
+                .param("filter", "checked_in")
+                .param("q", "ada")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID))))
+            .andExpect(status().isOk());
+
+        verify(attendeeService).listAttendees(eventId, CALLER_ID, 2, "checked_in", "ada");
+    }
+
+    // ---- Phase F: QR check-in ---------------------------------------------
+
+    private String validCheckInBody() {
+        return """
+            {"booking_id":"%s"}
+            """.formatted(UUID.randomUUID());
+    }
+
+    @Test
+    void checkIn_withoutToken_returns401() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        mockMvc.perform(post("/api/v1/organizer/events/" + eventId + "/check-in")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validCheckInBody()))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void checkIn_eventNotFound_returns404_withUnauthorizedBodyShape() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        when(eventService.requireEventOrganizerOrAdmin(eventId, CALLER_ID))
+            .thenThrow(new EventNotFoundException(eventId));
+
+        mockMvc.perform(post("/api/v1/organizer/events/" + eventId + "/check-in")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validCheckInBody()))
+            .andExpect(status().isNotFound())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("unauthorized"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.success").value(false));
+
+        verify(checkInService, org.mockito.Mockito.never()).checkIn(any(), any(), any(), any());
+    }
+
+    @Test
+    void checkIn_notOrganizerOrAdmin_returns403_withUnauthorizedBodyShape() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        when(eventService.requireEventOrganizerOrAdmin(eventId, CALLER_ID))
+            .thenThrow(new ForbiddenException("Forbidden"));
+
+        mockMvc.perform(post("/api/v1/organizer/events/" + eventId + "/check-in")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(validCheckInBody()))
+            .andExpect(status().isForbidden())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("unauthorized"));
+    }
+
+    @Test
+    void checkIn_neitherBookingIdNorReferenceSupplied_returns400_withInvalidStatus() throws Exception {
+        UUID eventId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/v1/organizer/events/" + eventId + "/check-in")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("invalid"));
+
+        verify(checkInService, org.mockito.Mockito.never()).checkIn(any(), any(), any(), any());
+    }
+
+    @Test
+    void checkIn_blankReferenceOnly_isTreatedAsMissing_returns400() throws Exception {
+        UUID eventId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/v1/organizer/events/" + eventId + "/check-in")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"reference":"   "}
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void checkIn_ignoresEventIdSuppliedInBody_authorizesAgainstUrlEventIdOnly() throws Exception {
+        UUID urlEventId = UUID.randomUUID();
+        UUID bodyClaimedEventId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        when(checkInService.checkIn(eq(urlEventId), eq(CALLER_ID), eq(bookingId), eq(null)))
+            .thenReturn(CheckInResponse.status("invalid"));
+
+        mockMvc.perform(post("/api/v1/organizer/events/" + urlEventId + "/check-in")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"booking_id":"%s","event_id":"%s"}
+                    """.formatted(bookingId, bodyClaimedEventId)))
+            .andExpect(status().isOk());
+
+        // The URL's eventId is what's authorized against and passed to the
+        // service — the body's event_id claim is never read for anything.
+        verify(eventService).requireEventOrganizerOrAdmin(urlEventId, CALLER_ID);
+        verify(checkInService).checkIn(urlEventId, CALLER_ID, bookingId, null);
+    }
+
+    @Test
+    void checkIn_success_returns200_withCheckedInStatus() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        CheckInResponse.AttendeeInfo attendee = new CheckInResponse.AttendeeInfo("Ada Lovelace", "ada@example.com", List.of());
+        when(checkInService.checkIn(eq(eventId), eq(CALLER_ID), eq(bookingId), eq(null)))
+            .thenReturn(CheckInResponse.checkedIn(attendee, "REF-ABC123", OffsetDateTime.now()));
+
+        mockMvc.perform(post("/api/v1/organizer/events/" + eventId + "/check-in")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"booking_id":"%s"}
+                    """.formatted(bookingId)))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("checked_in"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void checkIn_wrongEventOutcome_stillReturns200_notAnErrorStatus() throws Exception {
+        // Mirrors the existing route's HTTP contract exactly: wrong_event is
+        // a business outcome distinguished only by the status field, not by
+        // HTTP status code (unlike the auth failures above).
+        UUID eventId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        when(checkInService.checkIn(eq(eventId), eq(CALLER_ID), eq(bookingId), eq(null)))
+            .thenReturn(CheckInResponse.status("wrong_event"));
+
+        mockMvc.perform(post("/api/v1/organizer/events/" + eventId + "/check-in")
+                .with(SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(CALLER_ID).claim(SUB, CALLER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"booking_id":"%s"}
+                    """.formatted(bookingId)))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.status").value("wrong_event"));
     }
 }

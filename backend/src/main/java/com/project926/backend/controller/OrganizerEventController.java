@@ -1,10 +1,17 @@
 package com.project926.backend.controller;
 
+import com.project926.backend.dto.AttendeeListResponse;
+import com.project926.backend.dto.CheckInRequest;
+import com.project926.backend.dto.CheckInResponse;
 import com.project926.backend.dto.CreateEventRequest;
 import com.project926.backend.dto.CreateTicketTypeRequest;
 import com.project926.backend.dto.EventDto;
 import com.project926.backend.dto.TicketTypeDto;
 import com.project926.backend.dto.UpdateEventRequest;
+import com.project926.backend.exception.EventNotFoundException;
+import com.project926.backend.exception.ForbiddenException;
+import com.project926.backend.service.AttendeeService;
+import com.project926.backend.service.CheckInService;
 import com.project926.backend.service.EventService;
 import com.project926.backend.service.TicketTypeService;
 import jakarta.validation.Valid;
@@ -19,6 +26,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -39,10 +47,19 @@ public class OrganizerEventController {
 
     private final EventService eventService;
     private final TicketTypeService ticketTypeService;
+    private final AttendeeService attendeeService;
+    private final CheckInService checkInService;
 
-    public OrganizerEventController(EventService eventService, TicketTypeService ticketTypeService) {
+    public OrganizerEventController(
+        EventService eventService,
+        TicketTypeService ticketTypeService,
+        AttendeeService attendeeService,
+        CheckInService checkInService
+    ) {
         this.eventService = eventService;
         this.ticketTypeService = ticketTypeService;
+        this.attendeeService = attendeeService;
+        this.checkInService = checkInService;
     }
 
     @GetMapping
@@ -108,5 +125,65 @@ public class OrganizerEventController {
     ) {
         ticketTypeService.deleteTicketType(eventId, ticketTypeId, jwt.getSubject());
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Mirrors AttendeesPage's data (Phase F). Authorization is
+     * requireEventOrganizerOrAdmin — DISTINCT from every other endpoint in
+     * this controller (which use profileService.requireOrganizerOrAdminRole
+     * + strict ownership, no admin bypass): this one allows any platform
+     * admin, not just this event's own organizer, matching the existing
+     * shared requireEventOrganizer() function exactly (see EventService).
+     */
+    @GetMapping("/{eventId}/attendees")
+    public AttendeeListResponse listAttendees(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable UUID eventId,
+        @RequestParam(required = false) Integer page,
+        @RequestParam(required = false) String filter,
+        @RequestParam(name = "q", required = false) String search
+    ) {
+        return attendeeService.listAttendees(eventId, jwt.getSubject(), page, filter, search);
+    }
+
+    /**
+     * Mirrors the existing check-in route's structure deliberately closely,
+     * INCLUDING doing its own inline authorization try/catch here rather
+     * than in the service (see CheckInService's Javadoc for why): the
+     * existing route computes its HTTP status per auth-failure cause
+     * (401/404/403) but always uses the SAME body shape
+     * ({@code {success:false,status:'unauthorized',error:message}}) — a
+     * response-shape/status-code coupling that belongs at this layer, not
+     * buried in a generic exception handler shared by every other endpoint.
+     *
+     * Body validation (400 "invalid" when neither bookingId nor a
+     * non-blank reference is supplied) mirrors the existing zod
+     * {@code .refine()} check, done here rather than via {@code @Valid}
+     * for the same reason — the existing route's 400 body is
+     * {@code {success:false,status:'invalid'}}, not a generic validation-
+     * error shape.
+     */
+    @PostMapping("/{eventId}/check-in")
+    public ResponseEntity<CheckInResponse> checkIn(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable UUID eventId,
+        @RequestBody CheckInRequest request
+    ) {
+        try {
+            eventService.requireEventOrganizerOrAdmin(eventId, jwt.getSubject());
+        } catch (EventNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(CheckInResponse.unauthorized("Event not found"));
+        } catch (ForbiddenException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(CheckInResponse.unauthorized("Forbidden"));
+        }
+
+        boolean hasBookingId = request.bookingId() != null;
+        boolean hasReference = request.reference() != null && !request.reference().isBlank();
+        if (!hasBookingId && !hasReference) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(CheckInResponse.status("invalid"));
+        }
+
+        CheckInResponse response = checkInService.checkIn(eventId, jwt.getSubject(), request.bookingId(), request.reference());
+        return ResponseEntity.ok(response);
     }
 }

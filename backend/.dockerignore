@@ -1,0 +1,30 @@
+# Never let real credentials into the build context — the Dockerfile
+# doesn't reference these, but excluding them here means they can never
+# leak into an image layer even by accident (see the CRLF/env-file
+# investigation in the Phase J report for why runtime env vars are passed
+# via `--env-file` / `env_file:` instead, never copied into the image).
+.env
+.env.*
+!.env.example
+
+# Version control
+.git
+.gitignore
+
+# Build output — rebuilt fresh inside the image; a stale host-side target/
+# must never be copied in (that's the whole point of the multi-stage build).
+target/
+
+# IDE / editor
+.idea/
+*.iml
+*.iws
+.vscode/
+
+# Node (not used by this Java backend, excluded defensively)
+node_modules/
+
+# Logs / OS / temp
+*.log
+.DS_Store
+Thumbs.db

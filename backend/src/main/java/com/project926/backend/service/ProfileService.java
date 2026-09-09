@@ -56,4 +56,14 @@ public class ProfileService {
             throw new ForbiddenException("Requires organizer or admin role");
         }
     }
+
+    /**
+     * Mirrors {@code profile?.role === 'admin'} in
+     * lib/auth/server.ts#requireEventOrganizer exactly — used only by that
+     * function's Spring equivalent (EventService.requireEventOrganizerOrAdmin),
+     * distinct from requireOrganizerOrAdminRole's organizer-OR-admin check.
+     */
+    public boolean isAdmin(String clerkUserId) {
+        return "admin".equals(getRoleForAuthenticatedUser(clerkUserId).role());
+    }
 }

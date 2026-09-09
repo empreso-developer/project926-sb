@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { Calendar, MapPin, Sparkles, TrendingUp, Search } from 'lucide-react';
-import { isMissingSupabaseTableError, supabaseAdmin } from '@/lib/supabase/server';
+import { backendFetch } from '@/lib/backend/client';
 import type { EventRow, TicketType } from '@/lib/types';
 import { EventCard } from '@/components/event-card';
 import { Input } from '@/components/ui/input';
@@ -9,21 +9,23 @@ import { Badge } from '@/components/ui/badge';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Phase H: now calls Spring's public GET /api/v1/events (EventService —
+ * Phase B) instead of querying Supabase directly. EventDto's wire shape
+ * (snake_case via application.yml's global Jackson strategy) already
+ * matches EventRow & { ticket_types } exactly, so no field mapping is
+ * needed. Same fail-soft-to-empty-list behavior as the original on any
+ * error, so the homepage never crashes if the backend is briefly down.
+ */
 async function getApprovedEvents(): Promise<(EventRow & { ticket_types: TicketType[] })[]> {
-  const { data, error } = await supabaseAdmin
-    .from('events')
-    .select('*, ticket_types(*)')
-    .eq('status', 'approved')
-    .order('event_date', { ascending: true });
-
-  if (error) {
-    if (isMissingSupabaseTableError(error)) {
-      return [];
-    }
+  try {
+    return await backendFetch<(EventRow & { ticket_types: TicketType[] })[]>('/api/v1/events', {
+      authenticated: false,
+    });
+  } catch (error) {
     console.error('Failed to load events:', error);
     return [];
   }
-  return (data ?? []) as (EventRow & { ticket_types: TicketType[] })[];
 }
 
 export default async function Home() {

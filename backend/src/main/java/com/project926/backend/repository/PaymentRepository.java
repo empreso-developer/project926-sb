@@ -18,6 +18,16 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
      */
     Optional<Payment> findFirstByBookingIdOrderByCreatedAtDesc(UUID bookingId);
 
+    /**
+     * The Razorpay webhook's (Phase G) sole correlation path: every payment
+     * row gets exactly one Razorpay order id at create-order time
+     * (PaymentService.createOrder), so a webhook delivery's
+     * {@code payment.entity.order_id} maps back to at most one row here —
+     * see RazorpayWebhookService's Javadoc for the full correlation
+     * strategy.
+     */
+    Optional<Payment> findByRazorpayOrderId(String razorpayOrderId);
+
     /** Mirrors the rejectPayment() helper's {@code .update({ status: 'failed' }).eq('id', payment.id)}. */
     @Modifying
     @Transactional

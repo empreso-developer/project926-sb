@@ -1,0 +1,27 @@
+# Local development convenience only — NOT a production deployment
+# manifest. Supabase, Razorpay, Resend, and Clerk all remain external,
+# managed services; this compose file does not (and must not) stand up
+# local replacements for any of them.
+#
+# Real credentials come from backend/.env.dev (gitignored — see
+# .env.example for the placeholder-only template) via `env_file`, never
+# from this file. Docker's env-file parser was verified to correctly
+# strip Windows CRLF line endings (see the Phase J report) — unlike WSL2's
+# native bash `source`, no `.env.dev` file changes or extra filtering are
+# needed here.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: project926-backend:dev
+    env_file:
+      - .env.dev
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+    ports:
+      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
+    restart: unless-stopped
+    # No healthcheck: block here — inherits the Dockerfile's own
+    # HEALTHCHECK (which verifies a real DB round trip, not just process
+    # liveness). Redeclaring a weaker one here would silently override it.
