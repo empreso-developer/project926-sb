@@ -2,7 +2,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Calendar, MapPin, Shield, Ticket, Users, Check, X, Trash2, ArrowUpRight } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
 import { backendFetch } from '@/lib/backend/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { formatDate, formatTime, formatCurrency } from '@/lib/utils';
 import { AdminEventActions } from '@/components/admin-event-actions';
 import { AdminRoleSelect } from '@/components/admin-role-select';
-import type { EventRow, Profile, Booking } from '@/lib/types';
+import type { EventRow, UserRole } from '@/lib/types';
 
 interface AdminEvent {
   id: string;
@@ -31,37 +30,41 @@ interface AdminEvent {
   updated_at: string;
 }
 
+interface AdminUser {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: UserRole;
+  created_at: string;
+}
+
+interface AdminRevenue {
+  total_revenue: number;
+}
+
 /**
- * Phase H: the events list/table now calls Spring's GET /api/v1/admin/events
- * (EventModerationService — Phase C), which already returns the joined
- * organizer email/name (AdminEventDto). Approve/reject/remove (lib/actions/admin.ts)
- * also now call Spring.
+ * Phase H migrated events (Spring's GET /api/v1/admin/events —
+ * EventModerationService) and approve/reject/remove.
  *
- * INTENTIONAL, DOCUMENTED GAP (Phase H report "Remaining Next.js Backend
- * Calls"): the "Total users" stat, the "Revenue" stat, and the entire
- * Users table (with AdminRoleSelect) still query Supabase directly —
- * no phase A-G built an admin "list all profiles" or "platform-wide
- * revenue" endpoint, and inventing one is out of scope for a frontend/
- * backend integration phase. This page is intentionally a hybrid during
- * Phase H.
+ * Phase J closes the last documented gap: the "Total users" stat, the
+ * "Revenue" stat, and the Users table (with AdminRoleSelect) now call
+ * Spring's GET /api/v1/admin/users and GET /api/v1/admin/revenue
+ * (AdminUserService) instead of querying Supabase directly. This page no
+ * longer has any Supabase dependency.
  */
 export default async function AdminDashboard() {
   const { userId } = await auth();
   if (!userId) return null;
 
-  const [typedEvents, { data: profiles }, { data: bookings }] = await Promise.all([
+  const [typedEvents, typedProfiles, revenue] = await Promise.all([
     backendFetch<AdminEvent[]>('/api/v1/admin/events'),
-    supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false }),
-    supabaseAdmin.from('bookings').select('id, status, total_amount'),
+    backendFetch<AdminUser[]>('/api/v1/admin/users'),
+    backendFetch<AdminRevenue>('/api/v1/admin/revenue'),
   ]);
 
-  const typedProfiles = (profiles ?? []) as Profile[];
-  const typedBookings = (bookings ?? []) as Pick<Booking, 'id' | 'status' | 'total_amount'>[];
-
   const pendingEvents = typedEvents.filter((e) => e.status === 'published');
-  const totalRevenue = typedBookings
-    .filter((b) => b.status === 'confirmed')
-    .reduce((s, b) => s + Number(b.total_amount), 0);
+  const totalRevenue = Number(revenue.total_revenue);
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">

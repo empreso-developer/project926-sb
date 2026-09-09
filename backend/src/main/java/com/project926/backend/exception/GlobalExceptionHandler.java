@@ -24,7 +24,7 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler({EventNotFoundException.class, TicketTypeNotFoundException.class})
+    @ExceptionHandler({EventNotFoundException.class, TicketTypeNotFoundException.class, ProfileNotFoundException.class})
     public ResponseEntity<Map<String, Object>> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body("Not found"));
     }

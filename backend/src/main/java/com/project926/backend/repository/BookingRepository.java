@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -140,4 +141,15 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
         @Param("searchPattern") String searchPattern,
         Pageable pageable
     );
+
+    /**
+     * Mirrors the admin dashboard's Revenue stat exactly:
+     * {@code bookings.filter(b => b.status === 'confirmed').reduce((s,b) => s + Number(b.total_amount), 0)}
+     * — a database SUM aggregate over confirmed bookings' total_amount,
+     * NOT a payments-table calculation (see AdminUserService's Javadoc for
+     * why). COALESCE handles the zero-confirmed-bookings case, matching the
+     * existing reduce's `0` initial value.
+     */
+    @Query("SELECT COALESCE(SUM(b.totalAmount), 0) FROM Booking b WHERE b.status = 'confirmed'")
+    BigDecimal sumConfirmedRevenue();
 }
