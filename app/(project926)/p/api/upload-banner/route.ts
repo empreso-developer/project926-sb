@@ -1,44 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRole } from '@/lib/auth/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { auth } from '@clerk/nextjs/server';
+import { backendFetchRaw } from '@/lib/backend/client';
 
-const MAX_BYTES = 5 * 1024 * 1024; // 5MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-
+/**
+ * Thin proxy to Spring's POST /api/v1/organizer/banners (BannerUploadService)
+ * — the last Next.js Supabase dependency in the banner-upload flow. This
+ * route no longer imports lib/auth/server.ts or lib/supabase/server.ts:
+ * authorization (organizer or admin) and the Supabase Storage upload
+ * itself are entirely Spring's responsibility now. Response shape
+ * ({"url": "..."}) is unchanged, so components/event-form.tsx needed ZERO
+ * changes.
+ *
+ * The multipart FormData body is forwarded to Spring as-is (not
+ * re-parsed here) — see lib/backend/client.ts#backendFetchRaw's FormData
+ * handling.
+ */
 export async function POST(req: NextRequest) {
+  const { userId, getToken } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let formData: FormData;
   try {
-    // Real authorization check, server-side, via Clerk -- not RLS, since RLS
-    // can't see Clerk sessions at all (auth.uid() is always null here).
-    await requireRole('organizer');
+    formData = await req.formData();
   } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
-  const formData = await req.formData();
-  const file = formData.get('file');
-
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+  const token = await getToken();
+  // A network-level failure reaching Spring (not a Spring error response
+  // — an actual fetch() rejection) must not propagate uncaught and
+  // produce Next.js's default HTML error page instead of JSON — same
+  // pattern as every other backendFetchRaw-based proxy in this app
+  // (create-order, verify, check-in).
+  try {
+    const { status, data } = await backendFetchRaw('/api/v1/organizer/banners', {
+      method: 'POST',
+      body: formData,
+      token,
+    });
+    return NextResponse.json(data, { status });
+  } catch (err) {
+    console.error('[upload-banner] Backend request failed:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
-  }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: 'File too large (max 5MB)' }, { status: 400 });
-  }
-
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-  const { error: upErr } = await supabaseAdmin.storage
-    .from('event-banners')
-    .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type });
-
-  if (upErr) {
-    console.error('Banner upload failed:', upErr);
-    return NextResponse.json({ error: upErr.message }, { status: 500 });
-  }
-
-  const { data } = supabaseAdmin.storage.from('event-banners').getPublicUrl(path);
-  return NextResponse.json({ url: data.publicUrl });
 }

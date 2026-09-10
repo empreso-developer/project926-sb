@@ -20,6 +20,14 @@ spring:
     # Next.js response field names (lib/types.ts) ahead of a future frontend
     # cutover — no per-field @JsonProperty needed.
     property-naming-strategy: SNAKE_CASE
+  servlet:
+    multipart:
+      # Banner uploads (BannerUploadService) enforce a 5MB limit of their
+      # own with a clean 400 response; these are just the servlet
+      # container's outer ceiling so a slightly-over-5MB request fails
+      # with our validation error, not a generic container-level rejection.
+      max-file-size: 6MB
+      max-request-size: 6MB
 
 server:
   port: ${SERVER_PORT:8080}

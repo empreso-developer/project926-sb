@@ -106,13 +106,18 @@ export async function backendFetchRaw(
   options: { method?: string; body?: unknown; token: string | null },
 ): Promise<{ status: number; data: unknown }> {
   const { method = 'POST', body, token } = options;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // FormData (e.g. the banner-upload proxy) is forwarded as-is — fetch
+  // sets its own multipart Content-Type with the correct boundary, which
+  // must NOT be overridden here, unlike every other (JSON) caller.
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const headers: Record<string, string> = {};
+  if (!isFormData) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(`${BACKEND_URL}${path}`, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: isFormData ? (body as FormData) : body !== undefined ? JSON.stringify(body) : undefined,
     cache: 'no-store',
   });
 

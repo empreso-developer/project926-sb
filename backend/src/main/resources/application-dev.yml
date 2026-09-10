@@ -49,6 +49,16 @@ resend:
   from-email: ${RESEND_FROM_EMAIL:Project926 Tickets <onboarding@resend.dev>}
   reply-to: ${RESEND_REPLY_TO:}
 
+# Supabase Storage — used ONLY by SupabaseStorageGateway (organizer/admin
+# banner uploads). The datasource block above is a separate Postgres
+# connection; Storage is a distinct REST API needing its own URL + a
+# service-role key (never exposed to Next.js or the browser). Defaults to
+# the DEVELOPMENT Supabase project (memdvuuszsistdjckcfp) — never point
+# this at the original production project.
+supabase:
+  url: ${SUPABASE_URL:https://memdvuuszsistdjckcfp.supabase.co}
+  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+
 # Same env var name as the existing Next.js app's NEXT_PUBLIC_APP_URL,
 # reused rather than renamed — used to build the ticket email's
 # "View My Tickets" dashboard link, exactly like the existing route.

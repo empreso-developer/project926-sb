@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -114,6 +115,30 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, Object>> handleBadPathVariable(MethodArgumentTypeMismatchException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body("Invalid request"));
+    }
+
+    /**
+     * Mirrors the existing upload-banner route's three 400 outcomes with
+     * their exact message text preserved (same pattern as
+     * BookingValidationException) — see InvalidBannerFileException's
+     * Javadoc.
+     */
+    @ExceptionHandler(InvalidBannerFileException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidBannerFile(InvalidBannerFileException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body(ex.getMessage()));
+    }
+
+    /**
+     * A request body exceeding application.yml's servlet-container-level
+     * multipart.max-file-size (6MB — one above BannerUploadService's own
+     * 5MB check, since the container enforces its ceiling before any
+     * controller code runs). Mirrors the existing "File too large (max
+     * 5MB)" message for a consistent client experience regardless of which
+     * layer caught the oversized upload.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body("File too large (max 5MB)"));
     }
 
     @ExceptionHandler(Exception.class)

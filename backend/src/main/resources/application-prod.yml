@@ -29,6 +29,10 @@ resend:
   from-email: ${RESEND_FROM_EMAIL}
   reply-to: ${RESEND_REPLY_TO:}
 
+supabase:
+  url: ${SUPABASE_URL}
+  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY}
+
 app:
   public-url: ${NEXT_PUBLIC_APP_URL}
 
