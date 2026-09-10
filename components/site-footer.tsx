@@ -37,7 +37,7 @@ export function SiteFooter() {
           </div>
         </div>
         <div className="mt-10 border-t border-border/60 pt-6 text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Project926. Built with Next.js, Supabase & Razorpay.
+          © {new Date().getFullYear()} Project926. All rights reserved
         </div>
       </div>
     </footer>

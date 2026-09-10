@@ -48,33 +48,6 @@ export function SiteHeader() {
           <span className="font-display text-xl font-bold tracking-tight">Project926</span>
         </Link>
 
-        <nav className="hidden items-center gap-6 md:flex">
-          <Link
-            href="/p"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Discover
-          </Link>
-          <Link
-            href="/p/?tab=concerts"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Concerts
-          </Link>
-          <Link
-            href="/p/?tab=comedy"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Comedy
-          </Link>
-          <Link
-            href="/p/?tab=theatre"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Theatre
-          </Link>
-        </nav>
-
         <div className="flex items-center gap-2">
           {isSignedIn ? (
             <>

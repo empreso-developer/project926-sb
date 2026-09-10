@@ -55,9 +55,9 @@ export function renderTicketConfirmationEmail(
     <tr>
       <td align="center" style="padding:0 0 28px;">
         <img
-          src="https://empreso.in/logo-uncropped.png"
+          src="https://project926.com/logo-uncropped.png"
           width="150"
-          alt="Empreso"
+          alt="Project926"
           style="display:block;width:150px;height:auto;border:0;"
         />
       </td>
