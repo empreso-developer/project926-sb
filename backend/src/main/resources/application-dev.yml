@@ -42,6 +42,14 @@ razorpay:
   # reserved (RAZORPAY_WEBHOOK_SECRET), never previously wired to any code.
   webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
 
+# Clerk webhook — Svix-signed delivery secret, same format Clerk issues
+# (whsec_...) and the same env var name the existing Next.js route already
+# used (never previously wired to any Spring code). See
+# ClerkWebhookSignatureVerifier — a blank/missing secret fails closed
+# (every delivery rejected as invalid), never silently skips verification.
+clerk:
+  webhook-secret: ${CLERK_WEBHOOK_SECRET:}
+
 # Resend — same env var names as lib/resend/server.ts exactly (not renamed).
 # RESEND_REPLY_TO stays optional there too (falls back to undefined/unset).
 resend:

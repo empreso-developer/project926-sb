@@ -36,4 +36,44 @@ public interface ProfileRepository extends JpaRepository<Profile, String> {
     @Transactional
     @Query("UPDATE Profile p SET p.role = :role WHERE p.id = :id")
     int updateRole(@Param("id") String id, @Param("role") String role);
+
+    /**
+     * Mirrors the Clerk webhook's {@code supabaseAdmin.from('profiles').upsert(profile, {onConflict:'id'})}
+     * exactly: a single atomic INSERT ... ON CONFLICT DO UPDATE (native
+     * SQL — JPQL has no upsert), so a genuinely-new user and a
+     * re-delivered/duplicate event both converge on the identical final
+     * row with no read-then-write race, matching this repository's
+     * existing updateRole/BookingRepository's guarded-UPDATE convention.
+     * {@code created_at}/{@code updated_at} are deliberately NOT set here
+     * — the column DEFAULT now() handles a fresh INSERT, and the existing
+     * trg_profiles_updated_at BEFORE UPDATE trigger handles the conflict
+     * path, exactly as they already do for updateRole above.
+     */
+    @Modifying
+    @Transactional
+    @Query(value = "INSERT INTO profiles (id, email, first_name, last_name, role) "
+            + "VALUES (:id, :email, :firstName, :lastName, :role) "
+            + "ON CONFLICT (id) DO UPDATE SET "
+            + "email = EXCLUDED.email, first_name = EXCLUDED.first_name, "
+            + "last_name = EXCLUDED.last_name, role = EXCLUDED.role",
+            nativeQuery = true)
+    void upsertFromClerk(
+            @Param("id") String id,
+            @Param("email") String email,
+            @Param("firstName") String firstName,
+            @Param("lastName") String lastName,
+            @Param("role") String role);
+
+    /**
+     * Mirrors the Clerk webhook's {@code supabaseAdmin.from('profiles').delete().eq('id', data.id)}
+     * exactly: deleting a nonexistent id is a safe no-op (0 rows), unlike
+     * {@link org.springframework.data.repository.CrudRepository#deleteById}
+     * which throws EmptyResultDataAccessException when nothing matches —
+     * this is what makes a duplicate/re-delivered user.deleted event safe.
+     * Returns affected-row count, same pattern as updateRole.
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Profile p WHERE p.id = :id")
+    int deleteByIdSafe(@Param("id") String id);
 }

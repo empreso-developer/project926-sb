@@ -46,6 +46,13 @@ public class SecurityConfig {
                         // inside the controller itself, not here. Narrowly scoped
                         // to this exact POST path only — no broad /api/** exemption.
                         .requestMatchers(HttpMethod.POST, "/api/v1/webhooks/razorpay").permitAll()
+                        // Clerk webhook migration: same reasoning as Razorpay's
+                        // above — Clerk never holds a JWT issued by itself, its
+                        // own security is the svix-signature HMAC check
+                        // (ClerkWebhookSignatureVerifier), performed inside
+                        // ClerkWebhookController. Narrowly scoped to this exact
+                        // POST path only.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/webhooks/clerk").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {
                 }));
