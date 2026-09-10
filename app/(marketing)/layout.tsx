@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Toaster } from '@/components/ui/toaster';
-import { SiteHeader } from '@/components/site-header';
+import { SiteHeader } from '@/components/site-header-marketing';
 import { SiteFooter } from '@/components/site-footer';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
