@@ -74,13 +74,13 @@ export function SiteHeader() {
                   <DropdownContent role={role}/>
                 </DropdownMenu>
               </div>
-              <UserButton
+              {/* <UserButton
                 appearance={{
                   elements: {
                     avatarBox: 'h-9 w-9 rounded-full ring-2 ring-border',
                   },
                 }}
-              />
+              /> */}
               <Button variant="destructive" size="sm" onClick={() => signOut({ redirectUrl: '/p' })}>
                 Sign out
               </Button>
