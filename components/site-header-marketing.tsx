@@ -33,7 +33,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="group flex items-center gap-2">
+        <Link href="/p" className="group flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden transition-transform group-hover:scale-105">
             <Image
               src="/logo.png"
@@ -52,7 +52,7 @@ export function SiteHeader() {
           {isSignedIn ? (
             <>
               {/* Desktop */}
-              {/* <div className="hidden sm:block">
+              <div className="hidden sm:block">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm">
@@ -61,10 +61,10 @@ export function SiteHeader() {
                   </DropdownMenuTrigger>
                   <DropdownContent role={role}/>
                 </DropdownMenu>
-              </div> */}
+              </div>
 
               {/* Mobile */}
-              {/* <div className="sm:hidden">
+              <div className="sm:hidden">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">
@@ -73,28 +73,28 @@ export function SiteHeader() {
                   </DropdownMenuTrigger>
                   <DropdownContent role={role}/>
                 </DropdownMenu>
-              </div> */}
-              {/* <UserButton
+              </div>
+              <UserButton
                 appearance={{
                   elements: {
                     avatarBox: 'h-9 w-9 rounded-full ring-2 ring-border',
                   },
                 }}
-              /> */}
-              {/* <Button variant="destructive" size="sm" onClick={() => signOut({ redirectUrl: '/p' })}>
+              />
+              <Button variant="destructive" size="sm" onClick={() => signOut({ redirectUrl: '/p' })}>
                 Sign out
-              </Button> */}
+              </Button>
             </>
           ) : (
             <>
-              {/* <Button asChild variant="ghost" size="sm">
+              <Button asChild variant="ghost" size="sm">
                 <Link href="/p/sign-in">Sign in</Link>
               </Button>
               <Button asChild size="sm" className="shadow-soft">
                 <Link href="/p/sign-up">
                   Get started
                 </Link>
-              </Button> */}
+              </Button>
             </>
           )}
         </div>
